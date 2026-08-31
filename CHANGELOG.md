@@ -1,8 +1,18 @@
 # Changelog
 
-Notable user-facing changes will be recorded here once versioned releases begin.
-
 ## Unreleased
+
+## 0.1.1 - 2026-08-31
+
+- Added focused Read, Markup, Organize, and Automate workspaces with responsive controls
+- Promoted Recipe Press to a resizable document utility window
+- Added native named Undo and Redo across document editing workflows
+- Added a keyboard-first Command Index for actions, navigation, recent PDFs, and recipes
+- Added a persistent Activity Center for OCR, redaction, recipes, batches, watches, and queue jobs
+- Refined action typography and captured the updated interface in the project README
+- Restored document-scoped commands for PDFs opened directly from Finder
+
+## 0.1.0 - 2026-08-31
 
 - Native PDF viewing and editing workspace for macOS
 - Finder and multi-window document opening

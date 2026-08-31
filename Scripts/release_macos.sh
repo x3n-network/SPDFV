@@ -24,7 +24,10 @@ release_tmp="$(mktemp -d "${TMPDIR:-/tmp}/spdfv-release.XXXXXX")"
 staging_dir="$release_tmp/SPDFV"
 
 cleanup() {
+    local exit_status=$?
+    trap - EXIT
     rm -rf "$release_tmp"
+    exit "$exit_status"
 }
 trap cleanup EXIT
 
@@ -94,7 +97,7 @@ codesign --verify --deep --strict --verbose=2 "$app_path"
 cp -R "$app_path" "$staging_dir/"
 ln -s /Applications "$staging_dir/Applications"
 
-echo "Creating and signing $dmg_name…"
+echo "Creating and signing ${dmg_name}…"
 hdiutil create \
     -volname "SPDFV $version" \
     -srcfolder "$staging_dir" \
