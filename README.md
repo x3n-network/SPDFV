@@ -1,5 +1,7 @@
 # SPDFV
 
+![SPDFV Command Index](Screenshots/spdfv-command-index.png)
+
 SPDFV is a native PDF workspace for macOS. It opens quickly for ordinary reading, but keeps serious document work close at hand: annotations, page editing, forms, OCR, redaction, repeatable recipes, background jobs, and a command-line interface.
 
 The interface is deliberately compact. It is not a web view in a desktop shell, and documents do not leave the Mac for routine processing.
@@ -20,6 +22,20 @@ The interface is deliberately compact. It is not a web view in a desktop shell, 
 - Print through the native macOS print panel
 
 SPDFV is pre-release software. Keep an original copy of important documents while the editor is still being hardened.
+
+## Interface
+
+### Document workspace
+
+![SPDFV document workspace in Markup mode](Screenshots/spdfv-workspace.png)
+
+### Recipe Press
+
+![SPDFV Recipe Press with a verified workflow](Screenshots/spdfv-recipe-press.png)
+
+### Activity Center
+
+![SPDFV Activity Center showing completed document work](Screenshots/spdfv-activity-center.png)
 
 ## Requirements
 
