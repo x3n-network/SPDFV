@@ -22,7 +22,7 @@ struct SPDFVApp: App {
             SPDFVCommands()
         }
 
-        Window("Processing Queue", id: "processing-queue") {
+        Window("Activity Center", id: "processing-queue") {
             ProcessingQueueView()
                 .preferredColorScheme(nil)
         }

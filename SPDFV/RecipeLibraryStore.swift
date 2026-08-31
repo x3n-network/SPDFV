@@ -139,6 +139,7 @@ final class RecipeLibraryStore: ObservableObject {
               let recipe = entry(configuration.recipeID)?.recipe else { return }
         watchIsRunning = true
         defer { watchIsRunning = false }
+        var activityID: UUID?
 
         do {
             let input = try resolveBookmark(configuration.inputBookmark)
@@ -163,6 +164,11 @@ final class RecipeLibraryStore: ObservableObject {
                 watchStatus = "Caught up · no new PDFs"
                 return
             }
+            activityID = ActivityCenterStore.shared.begin(
+                kind: .watch,
+                title: "Run \(recipe.name) watch lane",
+                detail: "Processing \(urls.count) new PDF\(urls.count == 1 ? "" : "s") from \(configuration.inputName)"
+            )
             let inputs = try urls.map { PDFRecipeBatchInput(name: $0.lastPathComponent, data: try Data(contentsOf: $0)) }
             let result = PDFRecipeBatchRunner.run(recipe, inputs: inputs)
             for produced in result.outputs {
@@ -180,9 +186,18 @@ final class RecipeLibraryStore: ObservableObject {
             watchStatus = result.report.failedCount == 0
                 ? "Passed \(result.report.passedCount) new PDF\(result.report.passedCount == 1 ? "" : "s")"
                 : "Passed \(result.report.passedCount) · stopped \(result.report.failedCount)"
+            if let activityID {
+                ActivityCenterStore.shared.finish(
+                    activityID,
+                    detail: "Passed \(result.report.passedCount) · stopped \(result.report.failedCount)",
+                    outputURL: output
+                )
+            }
             persistWatch()
         } catch {
-            watchStatus = "Watch stopped · \((error as? PDFOperationError)?.description ?? error.localizedDescription)"
+            let message = (error as? PDFOperationError)?.description ?? error.localizedDescription
+            watchStatus = "Watch stopped · \(message)"
+            if let activityID { ActivityCenterStore.shared.fail(activityID, detail: message) }
         }
     }
 

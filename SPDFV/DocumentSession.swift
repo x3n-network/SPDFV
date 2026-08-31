@@ -24,7 +24,10 @@ final class DocumentSession: ObservableObject {
     @Published private(set) var recentDocuments: [URL] = []
     @Published private(set) var hasTextSelection = false
     @Published private(set) var isDirty = false
-    @Published private(set) var canUndoAnnotation = false
+    @Published private(set) var canUndoEdit = false
+    @Published private(set) var canRedoEdit = false
+    @Published private(set) var undoActionName: String?
+    @Published private(set) var redoActionName: String?
     @Published private(set) var annotationCount = 0
     @Published private(set) var annotationRecords: [AnnotationRecord] = []
     @Published private(set) var formFields: [PDFFormFieldReport] = []
@@ -64,10 +67,13 @@ final class DocumentSession: ObservableObject {
         return cache
     }()
     private var searchSelections: [PDFSelection] = []
-    private var annotationUndoStack: [AnnotationUndoOperation] = []
+    private var editUndoStack: [EditHistoryEntry] = []
+    private var editRedoStack: [EditHistoryEntry] = []
+    private var historyTruncated = false
     private var pendingStyleEdit: (entry: AnnotationEntry, snapshot: AnnotationSnapshot)?
     private var pageSelectionAnchor: Int?
     private let pagePositionKey = "spdfv.document-page-position.v1"
+    private let historyDepthLimit = 100
 
     init() {
         let savedLayout = UserDefaults.standard.string(forKey: "pageLayoutMode")
@@ -81,6 +87,14 @@ final class DocumentSession: ObservableObject {
 
     var displayName: String {
         fileURL?.deletingPathExtension().lastPathComponent ?? "SPDFV"
+    }
+
+    var undoMenuTitle: String {
+        undoActionName.map { "Undo \($0)" } ?? "Undo"
+    }
+
+    var redoMenuTitle: String {
+        redoActionName.map { "Redo \($0)" } ?? "Redo"
     }
 
     func open(_ url: URL) {
@@ -138,9 +152,11 @@ final class DocumentSession: ObservableObject {
         cachedThumbnails.removeAllObjects()
         outlineEntries = Self.flattenOutline(pdf.outlineRoot, document: pdf)
         documentDetails = Self.makeDocumentDetails(document: pdf, url: url)
-        annotationUndoStack = []
+        editUndoStack = []
+        editRedoStack = []
+        historyTruncated = false
         pendingStyleEdit = nil
-        canUndoAnnotation = false
+        refreshHistoryState()
         annotationCount = (0..<pdf.pageCount).reduce(into: 0) { count, index in
             count += pdf.page(at: index)?.annotations.filter { !$0.isFormWidget }.count ?? 0
         }
@@ -287,11 +303,22 @@ final class DocumentSession: ObservableObject {
 
     func applyFormValue(_ value: String, to field: PDFFormFieldReport) {
         guard let document else { return }
+        let matching = (0..<document.pageCount).flatMap { pageIndex -> [AnnotationEntry] in
+            guard let page = document.page(at: pageIndex) else { return [] }
+            return page.annotations
+                .filter { $0.isFormWidget && $0.fieldName == field.name }
+                .map { AnnotationEntry(page: page, annotation: $0, pageIndex: pageIndex) }
+        }
+        let modifications = matching.map {
+            FormFieldModification(entry: $0, snapshot: AnnotationSnapshot($0.annotation))
+        }
         do {
             try PDFOperations.applyFormValue(value, named: field.name, in: document)
+            guard !modifications.isEmpty else { return }
+            recordEdit(.formFieldsModified(modifications), actionName: "Fill Form Field")
             markDirty()
             refreshFormFields()
-            let pages = formFields.filter { $0.name == field.name }.map { $0.page - 1 }
+            let pages = matching.map(\.pageIndex)
             perform(.annotationsChanged(Array(Set(pages)).sorted()))
         } catch {
             errorMessage = "The field could not be updated: \(error.localizedDescription)"
@@ -315,8 +342,7 @@ final class DocumentSession: ObservableObject {
         guard let selectedFormField else { return }
         let entry = selectedFormField.entry
         entry.page.removeAnnotation(entry.annotation)
-        annotationUndoStack.append(.formFieldRemoved(entry))
-        canUndoAnnotation = true
+        recordEdit(.formFieldRemoved(entry), actionName: "Delete Form Field")
         self.selectedFormField = nil
         markDirty()
         cachedThumbnails.removeObject(forKey: NSNumber(value: entry.pageIndex))
@@ -334,8 +360,7 @@ final class DocumentSession: ObservableObject {
         let entry = AnnotationEntry(page: page, annotation: annotation, pageIndex: pageIndex)
         var snapshot = AnnotationSnapshot(annotation)
         snapshot.bounds = previousBounds
-        annotationUndoStack.append(.formFieldModified(entry, snapshot))
-        canUndoAnnotation = true
+        recordEdit(.formFieldModified(entry, snapshot), actionName: "Move Form Field")
         markDirty()
         cachedThumbnails.removeObject(forKey: NSNumber(value: pageIndex))
         refreshFormFields()
@@ -384,8 +409,7 @@ final class DocumentSession: ObservableObject {
             guard currentName.trimmingCharacters(in: .whitespacesAndNewlines)
                 != proposedName.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
             guard changedCount > 0 else { return }
-            annotationUndoStack.append(.formFieldsModified(modifications))
-            canUndoAnnotation = true
+            recordEdit(.formFieldsModified(modifications), actionName: "Rename Form Field")
             markDirty()
             let pages = Array(Set(matching.map(\.pageIndex))).sorted()
             for index in pages { cachedThumbnails.removeObject(forKey: NSNumber(value: index)) }
@@ -434,8 +458,7 @@ final class DocumentSession: ObservableObject {
     }
 
     func registerFormFieldTransaction(_ entry: AnnotationEntry) {
-        annotationUndoStack.append(.formFieldAdded(entry))
-        canUndoAnnotation = true
+        recordEdit(.formFieldAdded(entry), actionName: "Add Form Field")
         markDirty()
         cachedThumbnails.removeObject(forKey: NSNumber(value: entry.pageIndex))
         refreshFormFields()
@@ -459,9 +482,8 @@ final class DocumentSession: ObservableObject {
 
     func registerAnnotationTransaction(_ entries: [AnnotationEntry]) {
         guard !entries.isEmpty else { return }
-        annotationUndoStack.append(.added(entries))
+        recordEdit(.added(entries))
         annotationCount += entries.count
-        canUndoAnnotation = true
         markDirty()
         for entry in entries {
             cachedThumbnails.removeObject(forKey: NSNumber(value: entry.pageIndex))
@@ -470,8 +492,21 @@ final class DocumentSession: ObservableObject {
         refreshAnnotationRecords()
     }
 
-    func undoLastAnnotation() {
-        guard let operation = annotationUndoStack.popLast() else { return }
+    func undoLastEdit() {
+        guard let entry = editUndoStack.popLast() else { return }
+        let inverse = applyHistoryOperation(entry.operation)
+        editRedoStack.append(EditHistoryEntry(actionName: entry.actionName, operation: inverse))
+        synchronizeHistoryStateAndDirtyFlag()
+    }
+
+    func redoLastEdit() {
+        guard let entry = editRedoStack.popLast() else { return }
+        let inverse = applyHistoryOperation(entry.operation)
+        editUndoStack.append(EditHistoryEntry(actionName: entry.actionName, operation: inverse))
+        synchronizeHistoryStateAndDirtyFlag()
+    }
+
+    private func applyHistoryOperation(_ operation: AnnotationUndoOperation) -> AnnotationUndoOperation {
         switch operation {
         case .added(let added):
             annotationCount = max(0, annotationCount - added.count)
@@ -479,52 +514,68 @@ final class DocumentSession: ObservableObject {
                 entry.page.removeAnnotation(entry.annotation)
             }
             finishAnnotationUndo(added)
+            return .removed(added)
         case .removed(let removed):
             annotationCount += removed.count
             for entry in removed {
                 entry.page.addAnnotation(entry.annotation)
             }
             finishAnnotationUndo(removed)
+            return .added(removed)
         case .modified(let entry, let snapshot):
+            let inverse = AnnotationSnapshot(entry.annotation)
             snapshot.apply(to: entry.annotation)
             entry.annotation.modificationDate = Date()
             finishAnnotationUndo([entry])
+            return .modified(entry, inverse)
         case .pagesRotated(let rotations):
+            let inverse = rotations.map { PageRotation(page: $0.page, previousRotation: $0.page.rotation) }
             for rotation in rotations {
                 rotation.page.rotation = rotation.previousRotation
             }
             let restoredIndices = rotations.compactMap { document?.index(for: $0.page) }
             refreshAfterPageEdit(targetPage: restoredIndices.first ?? pageIndex, selectedPages: restoredIndices)
+            return .pagesRotated(inverse)
         case .pagesRemoved(let removals):
             for removal in removals.sorted(by: { $0.index < $1.index }) {
                 document?.insert(removal.page, at: removal.index)
             }
             let restoredIndices = removals.map(\.index).sorted()
             refreshAfterPageEdit(targetPage: restoredIndices.first ?? pageIndex, selectedPages: restoredIndices)
+            return .pagesInserted(indices: restoredIndices)
         case .pagesInserted(let indices):
+            let removals = indices.compactMap { index -> PageRemoval? in
+                guard let page = document?.page(at: index) else { return nil }
+                return PageRemoval(page: page, index: index)
+            }
             for index in indices.sorted(by: >) {
                 document?.removePage(at: index)
             }
             let target = min(indices.first ?? pageIndex, max(0, (document?.pageCount ?? 1) - 1))
             refreshAfterPageEdit(targetPage: target, selectedPages: [target])
+            return .pagesRemoved(removals)
         case .pagesCropped(let crops):
+            let inverse = crops.map { PageCrop(page: $0.page, previousCropBox: $0.page.bounds(for: .cropBox)) }
             for crop in crops {
                 crop.page.setBounds(crop.previousCropBox, for: .cropBox)
             }
             let restoredIndices = crops.compactMap { document?.index(for: $0.page) }
             refreshAfterPageEdit(targetPage: restoredIndices.first ?? pageIndex, selectedPages: restoredIndices)
+            return .pagesCropped(inverse)
         case .pageMoved(let from, let to):
             if let page = document?.page(at: to) {
                 document?.removePage(at: to)
                 document?.insert(page, at: from)
             }
             refreshAfterPageEdit(targetPage: from, selectedPages: [from])
+            return .pageMoved(from: to, to: from)
         case .formFieldAdded(let entry):
             entry.page.removeAnnotation(entry.annotation)
             cachedThumbnails.removeObject(forKey: NSNumber(value: entry.pageIndex))
             markDirty()
             refreshFormFields()
             perform(.annotationsChanged([entry.pageIndex]))
+            return .formFieldRemoved(entry)
         case .formFieldRemoved(let entry):
             entry.page.addAnnotation(entry.annotation)
             cachedThumbnails.removeObject(forKey: NSNumber(value: entry.pageIndex))
@@ -532,14 +583,20 @@ final class DocumentSession: ObservableObject {
             refreshFormFields()
             selectedFormField = FormFieldSelection(annotation: entry.annotation, page: entry.page, pageIndex: entry.pageIndex)
             perform(.annotationsChanged([entry.pageIndex]))
+            return .formFieldAdded(entry)
         case .formFieldModified(let entry, let snapshot):
+            let inverse = AnnotationSnapshot(entry.annotation)
             snapshot.apply(to: entry.annotation)
             cachedThumbnails.removeObject(forKey: NSNumber(value: entry.pageIndex))
             markDirty()
             refreshFormFields()
             selectedFormField = FormFieldSelection(annotation: entry.annotation, page: entry.page, pageIndex: entry.pageIndex)
             perform(.annotationsChanged([entry.pageIndex]))
+            return .formFieldModified(entry, inverse)
         case .formFieldsModified(let modifications):
+            let inverse = modifications.map {
+                FormFieldModification(entry: $0.entry, snapshot: AnnotationSnapshot($0.entry.annotation))
+            }
             for modification in modifications {
                 modification.snapshot.apply(to: modification.entry.annotation)
                 cachedThumbnails.removeObject(forKey: NSNumber(value: modification.entry.pageIndex))
@@ -554,8 +611,34 @@ final class DocumentSession: ObservableObject {
                 )
             }
             perform(.annotationsChanged(Array(Set(modifications.map(\.entry.pageIndex))).sorted()))
+            return .formFieldsModified(inverse)
         }
-        canUndoAnnotation = !annotationUndoStack.isEmpty
+    }
+
+    private func recordEdit(_ operation: AnnotationUndoOperation, actionName: String? = nil) {
+        editUndoStack.append(EditHistoryEntry(actionName: actionName ?? operation.actionName, operation: operation))
+        if editUndoStack.count > historyDepthLimit {
+            editUndoStack.removeFirst(editUndoStack.count - historyDepthLimit)
+            historyTruncated = true
+        }
+        editRedoStack.removeAll()
+        refreshHistoryState()
+    }
+
+    private func refreshHistoryState() {
+        undoActionName = editUndoStack.last?.actionName
+        redoActionName = editRedoStack.last?.actionName
+        canUndoEdit = !editUndoStack.isEmpty
+        canRedoEdit = !editRedoStack.isEmpty
+    }
+
+    private func synchronizeHistoryStateAndDirtyFlag() {
+        refreshHistoryState()
+        if editUndoStack.isEmpty && !historyTruncated {
+            markClean()
+        } else {
+            markDirty()
+        }
     }
 
     private func finishAnnotationUndo(_ entries: [AnnotationEntry]) {
@@ -583,8 +666,7 @@ final class DocumentSession: ObservableObject {
             return
         }
         guard !rotations.isEmpty else { return }
-        annotationUndoStack.append(.pagesRotated(rotations))
-        canUndoAnnotation = true
+        recordEdit(.pagesRotated(rotations))
         refreshAfterPageEdit(targetPage: pageIndex, selectedPages: indices)
     }
 
@@ -602,8 +684,7 @@ final class DocumentSession: ObservableObject {
             offset += 1
         }
         guard !insertedIndices.isEmpty else { return }
-        annotationUndoStack.append(.pagesInserted(indices: insertedIndices))
-        canUndoAnnotation = true
+        recordEdit(.pagesInserted(indices: insertedIndices), actionName: insertedIndices.count == 1 ? "Duplicate Page" : "Duplicate Pages")
         refreshAfterPageEdit(targetPage: insertedIndices.first!, selectedPages: insertedIndices)
     }
 
@@ -622,8 +703,7 @@ final class DocumentSession: ObservableObject {
             document.removePage(at: removal.index)
         }
         guard !removals.isEmpty else { return }
-        annotationUndoStack.append(.pagesRemoved(removals))
-        canUndoAnnotation = true
+        recordEdit(.pagesRemoved(removals))
         let target = min(indices.first ?? pageIndex, document.pageCount - 1)
         refreshAfterPageEdit(targetPage: target, selectedPages: [target])
     }
@@ -639,8 +719,7 @@ final class DocumentSession: ObservableObject {
         else { return }
         document.removePage(at: from)
         document.insert(page, at: to)
-        annotationUndoStack.append(.pageMoved(from: from, to: to))
-        canUndoAnnotation = true
+        recordEdit(.pageMoved(from: from, to: to))
         refreshAfterPageEdit(targetPage: to, selectedPages: [to])
     }
 
@@ -714,8 +793,7 @@ final class DocumentSession: ObservableObject {
 
     private func registerInsertedPages(_ insertedIndices: [Int]) {
         guard let first = insertedIndices.first else { return }
-        annotationUndoStack.append(.pagesInserted(indices: insertedIndices))
-        canUndoAnnotation = true
+        recordEdit(.pagesInserted(indices: insertedIndices))
         refreshAfterPageEdit(targetPage: first, selectedPages: insertedIndices)
     }
 
@@ -766,6 +844,12 @@ final class DocumentSession: ObservableObject {
         ocrStatusMessage = "Reading \(indices.count) page\(indices.count == 1 ? "" : "s") on this Mac…"
         lastOCRReport = nil
         lastOCROutputURL = nil
+        let activityID = ActivityCenterStore.shared.begin(
+            kind: .ocr,
+            title: "Create searchable PDF",
+            detail: "Reading \(indices.count) page\(indices.count == 1 ? "" : "s") on this Mac",
+            documentName: displayName
+        )
         let configuration = PDFOCRConfiguration(
             recognitionLevel: quality,
             languages: languages,
@@ -787,10 +871,16 @@ final class DocumentSession: ObservableObject {
                 lastOCRReport = report
                 lastOCROutputURL = outputURL
                 ocrStatusMessage = "Added \(report.recognizedLines) searchable lines to the copy."
+                ActivityCenterStore.shared.finish(
+                    activityID,
+                    detail: "Added \(report.recognizedLines) searchable lines across \(report.pages.count) page\(report.pages.count == 1 ? "" : "s")",
+                    outputURL: outputURL
+                )
                 NSWorkspace.shared.activateFileViewerSelecting([outputURL])
             } catch {
                 errorMessage = "The searchable copy could not be created: \(error.localizedDescription)"
                 ocrStatusMessage = "OCR stopped before the copy was written."
+                ActivityCenterStore.shared.fail(activityID, detail: error.localizedDescription)
             }
             isPerformingOCR = false
         }
@@ -857,6 +947,12 @@ final class DocumentSession: ObservableObject {
         isRedactionEditing = false
         lastRedactionReport = nil
         redactionStatusMessage = "Flattening affected pages and removing hidden objects…"
+        let activityID = ActivityCenterStore.shared.begin(
+            kind: .redaction,
+            title: "Create sanitized PDF",
+            detail: "Flattening \(regions.count) redaction region\(regions.count == 1 ? "" : "s") and removing hidden objects",
+            documentName: displayName
+        )
         Task { @MainActor in
             do {
                 let report = try await Task.detached(priority: .userInitiated) {
@@ -876,10 +972,16 @@ final class DocumentSession: ObservableObject {
                 }.value
                 lastRedactionReport = report
                 redactionStatusMessage = "Sanitized \(report.flattenedPages.count) page\(report.flattenedPages.count == 1 ? "" : "s"); \(report.verifiedAbsentTerms.count) forbidden term\(report.verifiedAbsentTerms.count == 1 ? "" : "s") verified absent."
+                ActivityCenterStore.shared.finish(
+                    activityID,
+                    detail: "Sanitized \(report.flattenedPages.count) page\(report.flattenedPages.count == 1 ? "" : "s") · verified \(report.verifiedAbsentTerms.count) forbidden term\(report.verifiedAbsentTerms.count == 1 ? "" : "s") absent",
+                    outputURL: outputURL
+                )
                 NSWorkspace.shared.activateFileViewerSelecting([outputURL])
             } catch {
                 errorMessage = "The sanitized copy could not be created: \(error.localizedDescription)"
                 redactionStatusMessage = "Secure export stopped before a verified copy was written."
+                ActivityCenterStore.shared.fail(activityID, detail: error.localizedDescription)
             }
             isSanitizingRedactions = false
         }
@@ -932,10 +1034,9 @@ final class DocumentSession: ObservableObject {
 
         let index = document.index(for: page)
         guard index != NSNotFound else { return }
-        annotationUndoStack.append(.pagesCropped([
+        recordEdit(.pagesCropped([
             PageCrop(page: page, previousCropBox: previousCropBox)
         ]))
-        canUndoAnnotation = true
         cachedThumbnails.removeObject(forKey: NSNumber(value: index))
         pageIndex = index
         selectedPageIndices = [index]
@@ -964,8 +1065,7 @@ final class DocumentSession: ObservableObject {
         }
 
         guard !crops.isEmpty else { return }
-        annotationUndoStack.append(.pagesCropped(crops))
-        canUndoAnnotation = true
+        recordEdit(.pagesCropped(crops))
         refreshAfterPageEdit(targetPage: pageIndex, selectedPages: indices)
     }
 
@@ -992,8 +1092,7 @@ final class DocumentSession: ObservableObject {
         let entry = selectedAnnotation.entry
         entry.page.removeAnnotation(entry.annotation)
         annotationCount = max(0, annotationCount - 1)
-        annotationUndoStack.append(.removed([entry]))
-        canUndoAnnotation = true
+        recordEdit(.removed([entry]))
         self.selectedAnnotation = nil
         markAnnotationsChanged([entry])
     }
@@ -1055,10 +1154,9 @@ final class DocumentSession: ObservableObject {
         guard let selectedAnnotation else { return }
         let annotation = selectedAnnotation.annotation
         guard annotation.contents != contents else { return }
-        annotationUndoStack.append(.modified(selectedAnnotation.entry, AnnotationSnapshot(annotation)))
+        recordEdit(.modified(selectedAnnotation.entry, AnnotationSnapshot(annotation)), actionName: "Edit Annotation Text")
         annotation.contents = contents
         annotation.modificationDate = Date()
-        canUndoAnnotation = true
         markAnnotationsChanged([selectedAnnotation.entry])
     }
 
@@ -1067,10 +1165,9 @@ final class DocumentSession: ObservableObject {
         let annotation = selectedAnnotation.annotation
         let newColor = preset.nsColor
         guard annotation.color != newColor else { return }
-        annotationUndoStack.append(.modified(selectedAnnotation.entry, AnnotationSnapshot(annotation)))
+        recordEdit(.modified(selectedAnnotation.entry, AnnotationSnapshot(annotation)), actionName: "Change Annotation Color")
         annotation.color = newColor
         annotation.modificationDate = Date()
-        canUndoAnnotation = true
         markAnnotationsChanged([selectedAnnotation.entry])
     }
 
@@ -1115,8 +1212,7 @@ final class DocumentSession: ObservableObject {
 
     func commitSelectedAnnotationStyleEdit() {
         guard let pendingStyleEdit else { return }
-        annotationUndoStack.append(.modified(pendingStyleEdit.entry, pendingStyleEdit.snapshot))
-        canUndoAnnotation = true
+        recordEdit(.modified(pendingStyleEdit.entry, pendingStyleEdit.snapshot), actionName: "Change Annotation Style")
         self.pendingStyleEdit = nil
         refreshAnnotationRecords()
     }
@@ -1131,8 +1227,7 @@ final class DocumentSession: ObservableObject {
         let entry = AnnotationEntry(page: page, annotation: annotation, pageIndex: pageIndex)
         var snapshot = AnnotationSnapshot(annotation)
         snapshot.bounds = previousBounds
-        annotationUndoStack.append(.modified(entry, snapshot))
-        canUndoAnnotation = true
+        recordEdit(.modified(entry, snapshot), actionName: "Move Annotation")
         markAnnotationsChanged([entry])
     }
 
@@ -1402,14 +1497,25 @@ final class DocumentSession: ObservableObject {
         guard let loadedRecipe, let data = document?.dataRepresentation() else { return }
         isRunningRecipe = true
         defer { isRunningRecipe = false }
+        let activityID = ActivityCenterStore.shared.begin(
+            kind: .recipe,
+            title: "Check \(loadedRecipe.name)",
+            detail: "Verifying \(loadedRecipe.steps.count) recipe step\(loadedRecipe.steps.count == 1 ? "" : "s") without writing output",
+            documentName: displayName
+        )
         do {
             recipeReport = try PDFRecipeRunner.run(loadedRecipe, on: data, dryRun: true).report
             lastRecipeOutputURL = nil
             batchRecipeReport = nil
             lastBatchOutputDirectory = nil
+            ActivityCenterStore.shared.finish(
+                activityID,
+                detail: "Verified \(recipeReport?.steps.count ?? 0) step\((recipeReport?.steps.count ?? 0) == 1 ? "" : "s") · \(recipeReport?.outputPageCount ?? 0) output page\((recipeReport?.outputPageCount ?? 0) == 1 ? "" : "s")"
+            )
         } catch {
             recipeReport = nil
             errorMessage = "Recipe dry-run failed: \(Self.message(for: error))"
+            ActivityCenterStore.shared.fail(activityID, detail: Self.message(for: error))
         }
     }
 
@@ -1424,6 +1530,12 @@ final class DocumentSession: ObservableObject {
 
         isRunningRecipe = true
         defer { isRunningRecipe = false }
+        let activityID = ActivityCenterStore.shared.begin(
+            kind: .recipe,
+            title: "Export \(loadedRecipe.name)",
+            detail: "Applying \(loadedRecipe.steps.count) recipe step\(loadedRecipe.steps.count == 1 ? "" : "s")",
+            documentName: displayName
+        )
         do {
             let result = try PDFRecipeRunner.run(loadedRecipe, on: data)
             try result.data.write(to: url, options: .atomic)
@@ -1436,8 +1548,14 @@ final class DocumentSession: ObservableObject {
             lastBatchOutputDirectory = nil
             NSDocumentController.shared.noteNewRecentDocumentURL(url)
             refreshRecentDocuments()
+            ActivityCenterStore.shared.finish(
+                activityID,
+                detail: "Exported \(result.report.outputPageCount) page\(result.report.outputPageCount == 1 ? "" : "s") after \(result.report.steps.count) verified step\(result.report.steps.count == 1 ? "" : "s")",
+                outputURL: url
+            )
         } catch {
             errorMessage = "Recipe export failed: \(Self.message(for: error))"
+            ActivityCenterStore.shared.fail(activityID, detail: Self.message(for: error))
         }
     }
 
@@ -1477,6 +1595,12 @@ final class DocumentSession: ObservableObject {
 
         isRunningRecipe = true
         defer { isRunningRecipe = false }
+        let activityID = ActivityCenterStore.shared.begin(
+            kind: .batch,
+            title: "Process folder with \(loadedRecipe.name)",
+            detail: "Reading PDFs from \(inputDirectory.lastPathComponent)",
+            documentName: displayName
+        )
         do {
             let urls = try FileManager.default.contentsOfDirectory(
                 at: inputDirectory,
@@ -1505,8 +1629,14 @@ final class DocumentSession: ObservableObject {
             lastBatchOutputDirectory = outputDirectory
             recipeReport = nil
             lastRecipeOutputURL = nil
+            ActivityCenterStore.shared.finish(
+                activityID,
+                detail: "Passed \(result.report.passedCount) · stopped \(result.report.failedCount)",
+                outputURL: outputDirectory
+            )
         } catch {
             errorMessage = "Batch processing failed: \(Self.message(for: error))"
+            ActivityCenterStore.shared.fail(activityID, detail: Self.message(for: error))
         }
     }
 
@@ -1559,8 +1689,10 @@ final class DocumentSession: ObservableObject {
 
             documentDetails = Self.makeDocumentDetails(document: savedDocument, url: targetURL)
 
-            annotationUndoStack = []
-            canUndoAnnotation = false
+            editUndoStack = []
+            editRedoStack = []
+            historyTruncated = false
+            refreshHistoryState()
             markClean()
             NSDocumentController.shared.noteNewRecentDocumentURL(targetURL)
             refreshRecentDocuments()
@@ -1773,6 +1905,11 @@ struct AnnotationEntry {
     let pageIndex: Int
 }
 
+private struct EditHistoryEntry {
+    let actionName: String
+    let operation: AnnotationUndoOperation
+}
+
 private enum AnnotationUndoOperation {
     case added([AnnotationEntry])
     case removed([AnnotationEntry])
@@ -1786,6 +1923,35 @@ private enum AnnotationUndoOperation {
     case formFieldRemoved(AnnotationEntry)
     case formFieldModified(AnnotationEntry, AnnotationSnapshot)
     case formFieldsModified([FormFieldModification])
+
+    var actionName: String {
+        switch self {
+        case .added(let entries):
+            entries.count == 1 ? "Add Annotation" : "Add Annotations"
+        case .removed(let entries):
+            entries.count == 1 ? "Delete Annotation" : "Delete Annotations"
+        case .modified:
+            "Edit Annotation"
+        case .pagesRotated(let rotations):
+            rotations.count == 1 ? "Rotate Page" : "Rotate Pages"
+        case .pagesRemoved(let removals):
+            removals.count == 1 ? "Delete Page" : "Delete Pages"
+        case .pagesInserted(let indices):
+            indices.count == 1 ? "Insert Page" : "Insert Pages"
+        case .pagesCropped(let crops):
+            crops.count == 1 ? "Crop Page" : "Crop Pages"
+        case .pageMoved:
+            "Move Page"
+        case .formFieldAdded:
+            "Add Form Field"
+        case .formFieldRemoved:
+            "Delete Form Field"
+        case .formFieldModified:
+            "Edit Form Field"
+        case .formFieldsModified(let modifications):
+            modifications.count == 1 ? "Edit Form Field" : "Edit Form Fields"
+        }
+    }
 }
 
 private struct FormFieldModification {
@@ -1816,6 +1982,7 @@ private struct AnnotationSnapshot {
     let borderLineWidth: CGFloat?
     let font: NSFont?
     let fontColor: NSColor?
+    let widgetStringValue: String?
     let pathLineWidths: [CGFloat]
 
     init(_ annotation: PDFAnnotation) {
@@ -1826,6 +1993,7 @@ private struct AnnotationSnapshot {
         borderLineWidth = annotation.border?.lineWidth
         font = annotation.font
         fontColor = annotation.fontColor
+        widgetStringValue = annotation.widgetStringValue
         pathLineWidths = annotation.paths?.map(\.lineWidth) ?? []
     }
 
@@ -1841,6 +2009,9 @@ private struct AnnotationSnapshot {
         annotation.font = font
         annotation.fontColor = fontColor
         annotation.fieldName = fieldName
+        if annotation.isFormWidget {
+            annotation.widgetStringValue = widgetStringValue
+        }
         if let paths = annotation.paths {
             for (index, path) in paths.enumerated() where pathLineWidths.indices.contains(index) {
                 path.lineWidth = pathLineWidths[index]

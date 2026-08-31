@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 
 struct ViewerActions {
@@ -20,7 +21,8 @@ struct ViewerActions {
     let printDocument: () -> Void
     let addMarkup: (MarkupKind) -> Void
     let setAnnotationTool: (CanvasAnnotationTool) -> Void
-    let undoAnnotation: () -> Void
+    let undoEdit: () -> Void
+    let redoEdit: () -> Void
     let deleteAnnotation: () -> Void
     let duplicateAnnotation: () -> Void
     let nudgeSelection: (CGFloat, CGFloat) -> Void
@@ -35,11 +37,16 @@ struct ViewerActions {
     let selectedPageCount: Int
     let canDeletePage: Bool
     let canAnnotate: Bool
-    let canUndoAnnotation: Bool
+    let undoTitle: String
+    let redoTitle: String
+    let canUndoEdit: Bool
+    let canRedoEdit: Bool
     let canDeleteAnnotation: Bool
     let canNudgeSelection: Bool
     let canSave: Bool
     let canPrint: Bool
+    let showCommandPalette: () -> Void
+    let openRecipePress: () -> Void
     let setTheme: (ThemePreference) -> Void
 }
 
@@ -54,11 +61,46 @@ extension FocusedValues {
     }
 }
 
+@MainActor
+final class ViewerCommandCenter: ObservableObject {
+    static let shared = ViewerCommandCenter()
+
+    @Published private(set) var actions: ViewerActions?
+    private weak var activeSession: DocumentSession?
+
+    private init() {}
+
+    func activate(_ actions: ViewerActions, for session: DocumentSession) {
+        activeSession = session
+        self.actions = actions
+    }
+
+    func deactivate(_ session: DocumentSession) {
+        guard activeSession === session else { return }
+        activeSession = nil
+        actions = nil
+    }
+}
+
 struct SPDFVCommands: Commands {
-    @FocusedValue(\.viewerActions) private var actions
+    @FocusedValue(\.viewerActions) private var focusedActions
+    @ObservedObject private var commandCenter = ViewerCommandCenter.shared
     @Environment(\.openWindow) private var openWindow
 
+    private var actions: ViewerActions? {
+        focusedActions ?? commandCenter.actions
+    }
+
     var body: some Commands {
+        CommandGroup(replacing: .undoRedo) {
+            Button(actions?.undoTitle ?? "Undo") { actions?.undoEdit() }
+                .keyboardShortcut("z")
+                .disabled(actions?.canUndoEdit != true)
+            Button(actions?.redoTitle ?? "Redo") { actions?.redoEdit() }
+                .keyboardShortcut("z", modifiers: [.command, .shift])
+                .disabled(actions?.canRedoEdit != true)
+        }
+
         CommandGroup(replacing: .newItem) {
             Button("Open PDF…") {
                 actions?.openDocument()
@@ -118,10 +160,6 @@ struct SPDFVCommands: Commands {
                     .keyboardShortcut(.downArrow, modifiers: [.command])
             }
             .disabled(actions?.canNudgeSelection != true)
-
-            Button("Undo Last Edit") { actions?.undoAnnotation() }
-                .keyboardShortcut("z")
-                .disabled(actions?.canUndoAnnotation != true)
         }
 
         CommandMenu("Pages") {
@@ -153,6 +191,12 @@ struct SPDFVCommands: Commands {
         }
 
         CommandMenu("Navigate") {
+            Button("Command Palette…") { actions?.showCommandPalette() }
+                .keyboardShortcut("k")
+                .disabled(actions == nil)
+
+            Divider()
+
             Button("Pages") { actions?.showPages() }
                 .keyboardShortcut("1")
             Button("Contents") { actions?.showOutline() }
@@ -205,7 +249,13 @@ struct SPDFVCommands: Commands {
         }
 
         CommandMenu("Automation") {
-            Button("Open Processing Queue") {
+            Button("Open Recipe Press") {
+                actions?.openRecipePress()
+            }
+            .keyboardShortcut("r", modifiers: [.command, .shift])
+            .disabled(actions == nil)
+
+            Button("Open Activity Center") {
                 openWindow(id: "processing-queue")
             }
             .keyboardShortcut("l", modifiers: [.command, .shift])

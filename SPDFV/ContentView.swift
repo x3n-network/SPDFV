@@ -7,7 +7,10 @@ struct ContentView: View {
     @StateObject private var session = DocumentSession()
     @State private var isTargeted = false
     @State private var didOpenInitialURL = false
+    @State private var commandPalettePresented = false
+    @State private var workspaceMode = DocumentWorkspaceMode.read
     @AppStorage("themePreference") private var themePreferenceRaw = ThemePreference.system.rawValue
+    @Environment(\.openWindow) private var openWindow
     private let initialURL: URL?
 
     init(initialURL: URL? = nil) {
@@ -26,6 +29,7 @@ struct ContentView: View {
                 ReaderView(
                     session: session,
                     themePreference: themePreference,
+                    workspaceMode: $workspaceMode,
                     openDocument: openDocument,
                     saveAs: saveDocumentAs
                 )
@@ -33,7 +37,10 @@ struct ContentView: View {
         }
         .frame(minWidth: 820, minHeight: 560)
         .background(SPDFVTheme.canvas)
-        .background(WindowCloseGuard(session: session).frame(width: 0, height: 0))
+        .background(
+            WindowCloseGuard(session: session, viewerActions: viewerActions)
+                .frame(width: 0, height: 0)
+        )
         .navigationTitle(session.document == nil ? "SPDFV" : session.displayName)
         .dropDestination(for: URL.self, action: handleDrop, isTargeted: { isTargeted = $0 })
         .overlay {
@@ -60,6 +67,15 @@ struct ContentView: View {
         } message: {
             Text("Your markup in \(session.displayName) has not been saved.")
         }
+        .sheet(isPresented: $commandPalettePresented) {
+            CommandPaletteView(
+                session: session,
+                workspaceMode: $workspaceMode,
+                openDocument: openDocument,
+                saveDocumentAs: saveDocumentAs,
+                openActivityCenter: { openWindow(id: "processing-queue") }
+            )
+        }
         .onOpenURL { session.open($0) }
         .preferredColorScheme(themePreference.wrappedValue.colorScheme)
         .focusedSceneValue(\.viewerActions, viewerActions)
@@ -73,6 +89,7 @@ struct ContentView: View {
             }
         }
         .onDisappear {
+            RecipeWorkspaceWindowManager.shared.close(for: session)
             CloseProtectionCenter.shared.unregister(session)
             DocumentWindowManager.shared.unregister(session)
         }
@@ -109,7 +126,8 @@ struct ContentView: View {
             printDocument: { session.perform(.printDocument) },
             addMarkup: { session.addMarkup($0) },
             setAnnotationTool: { session.setAnnotationTool($0) },
-            undoAnnotation: { session.undoLastAnnotation() },
+            undoEdit: { session.undoLastEdit() },
+            redoEdit: { session.redoLastEdit() },
             deleteAnnotation: { session.deleteSelectedAnnotation() },
             duplicateAnnotation: { session.duplicateSelectedAnnotation() },
             nudgeSelection: { session.nudgeSelectedObject(horizontal: $0, vertical: $1) },
@@ -124,11 +142,16 @@ struct ContentView: View {
             selectedPageCount: session.selectedPageIndices.count,
             canDeletePage: max(1, session.selectedPageIndices.count) < session.pageCount,
             canAnnotate: session.hasTextSelection,
-            canUndoAnnotation: session.canUndoAnnotation,
+            undoTitle: session.undoMenuTitle,
+            redoTitle: session.redoMenuTitle,
+            canUndoEdit: session.canUndoEdit,
+            canRedoEdit: session.canRedoEdit,
             canDeleteAnnotation: session.selectedAnnotation != nil,
             canNudgeSelection: session.selectedAnnotation != nil || session.selectedFormField != nil,
             canSave: session.isDirty,
             canPrint: session.document?.allowsPrinting == true,
+            showCommandPalette: { commandPalettePresented = true },
+            openRecipePress: { RecipeWorkspaceWindowManager.shared.open(for: session) },
             setTheme: { themePreference.wrappedValue = $0 }
         )
     }
@@ -199,6 +222,7 @@ struct ContentView: View {
 private struct ReaderView: View {
     @ObservedObject var session: DocumentSession
     @Binding var themePreference: ThemePreference
+    @Binding var workspaceMode: DocumentWorkspaceMode
     let openDocument: () -> Void
     let saveAs: () -> Void
 
@@ -210,7 +234,7 @@ private struct ReaderView: View {
                 openDocument: openDocument
             )
 
-            MarkupBench(session: session, saveAs: saveAs)
+            WorkspaceBench(session: session, mode: $workspaceMode, saveAs: saveAs)
 
             if session.selectedAnnotation != nil {
                 AnnotationInspectorStrip(session: session)
@@ -382,191 +406,341 @@ private struct FolioBar: View {
     }
 }
 
-private struct MarkupBench: View {
+enum DocumentWorkspaceMode: String, CaseIterable, Identifiable {
+    case read
+    case markup
+    case organize
+    case automate
+
+    var id: Self { self }
+
+    var label: String {
+        switch self {
+        case .read: "Read"
+        case .markup: "Markup"
+        case .organize: "Organize"
+        case .automate: "Automate"
+        }
+    }
+
+    var icon: SPDFVIconName {
+        switch self {
+        case .read: .document
+        case .markup: .highlighter
+        case .organize: .pages
+        case .automate: .automation
+        }
+    }
+}
+
+private struct WorkspaceBench: View {
     @ObservedObject var session: DocumentSession
     @ObservedObject private var automation = ProcessingQueueStore.shared
+    @Binding var mode: DocumentWorkspaceMode
     @Environment(\.openWindow) private var openWindow
     let saveAs: () -> Void
     @State private var showsOCRPanel = false
     @State private var showsRedactionGate = false
-    @State private var showsRecipePanel = false
 
     var body: some View {
-        HStack(spacing: 4) {
-            Text("MARKUP")
-                .font(.system(size: 9, weight: .black, design: .monospaced))
-                .tracking(1.2)
-                .foregroundStyle(SPDFVTheme.secondaryText)
-                .padding(.trailing, 8)
-
-            ForEach(MarkupKind.allCases) { kind in
-                MarkupToolButton(kind: kind) {
-                    session.addMarkup(kind)
-                }
-                .disabled(!session.hasTextSelection)
-            }
-
-            Rectangle()
-                .fill(SPDFVTheme.divider)
-                .frame(width: 1, height: 20)
-                .padding(.horizontal, 7)
-
-            ForEach(CanvasAnnotationTool.quickTools) { tool in
-                CanvasToolButton(
-                    tool: tool,
-                    isSelected: session.activeAnnotationTool == tool
-                ) {
-                    session.setAnnotationTool(tool)
-                }
-            }
-
-            Rectangle()
-                .fill(SPDFVTheme.divider)
-                .frame(width: 1, height: 20)
-                .padding(.horizontal, 7)
-
-            SquareToolButton(icon: .back, help: "Undo last edit") {
-                session.undoLastAnnotation()
-            }
-            .disabled(!session.canUndoAnnotation)
-
-            Text(benchStatus)
-                .font(.system(size: 9, weight: .bold, design: .monospaced))
-                .tracking(0.7)
-                .foregroundStyle(
-                    session.hasTextSelection || session.activeAnnotationTool != .select
-                        ? SPDFVTheme.paleCobalt
-                        : SPDFVTheme.tertiaryText
-                )
-                .padding(.leading, 8)
-
-            Spacer()
-
-            Button {
-                openWindow(id: "processing-queue")
-            } label: {
-                HStack(spacing: 7) {
-                    SPDFVIcon(.automation)
-                    Text("QUEUE")
-                        .font(.system(size: 9, weight: .black, design: .monospaced))
-                        .tracking(0.8)
-                    if automation.queue.summary.queued + automation.queue.summary.failed > 0 {
-                        Text("\(automation.queue.summary.queued + automation.queue.summary.failed)")
-                            .font(.system(size: 7, weight: .black, design: .monospaced))
-                            .foregroundStyle(Color.white)
-                            .frame(minWidth: 14, minHeight: 14)
-                            .background(automation.queue.summary.failed > 0 ? SPDFVTheme.redaction : SPDFVTheme.cobalt)
-                    }
-                }
-                .foregroundStyle(automation.queue.summary.failed > 0 ? SPDFVTheme.redaction : SPDFVTheme.primaryText)
-                .padding(.horizontal, 10)
-                .frame(height: 30)
-                .overlay { Rectangle().stroke(SPDFVTheme.divider, lineWidth: 1) }
-            }
-            .buttonStyle(.plain)
-            .help("Open the processing queue")
-
-            Button {
-                showsRecipePanel.toggle()
-            } label: {
-                HStack(spacing: 7) {
-                    SPDFVIcon(.quickAction)
-                    Text("RECIPE")
-                        .font(.system(size: 9, weight: .black, design: .monospaced))
-                        .tracking(0.8)
-                }
-                .foregroundStyle(session.loadedRecipe == nil ? SPDFVTheme.primaryText : SPDFVTheme.paleCobalt)
-                .padding(.horizontal, 10)
-                .frame(height: 30)
-                .overlay { Rectangle().stroke(SPDFVTheme.divider, lineWidth: 1) }
-            }
-            .buttonStyle(.plain)
-            .disabled(session.isRunningRecipe)
-            .popover(isPresented: $showsRecipePanel, arrowEdge: .top) {
-                RecipePanel(session: session, isPresented: $showsRecipePanel)
-            }
-            .help("Validate and export a recipe")
-
-            Button {
-                showsRedactionGate.toggle()
-            } label: {
-                SPDFVIcon(.region)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(session.pendingRedactions.isEmpty ? SPDFVTheme.primaryText : SPDFVTheme.redaction)
-                    .frame(width: 42, height: 30)
-                    .overlay(alignment: .topTrailing) {
-                        if !session.pendingRedactions.isEmpty {
-                            Text("\(session.pendingRedactions.count)")
-                                .font(.system(size: 7, weight: .black, design: .monospaced))
-                                .foregroundStyle(Color.white)
-                                .frame(minWidth: 14, minHeight: 14)
-                                .background(SPDFVTheme.redaction)
-                                .clipShape(Circle())
-                                .offset(x: 4, y: -4)
-                        }
-                    }
-                    .overlay { Rectangle().stroke(SPDFVTheme.divider, lineWidth: 1) }
-                }
-            .buttonStyle(.plain)
-            .disabled(session.isSanitizingRedactions)
-            .popover(isPresented: $showsRedactionGate, arrowEdge: .top) {
-                RedactionGate(session: session, isPresented: $showsRedactionGate)
-            }
-            .accessibilityLabel("Redaction Gate")
-            .accessibilityValue("\(session.pendingRedactions.count) staged regions")
-            .help("Stage regions and create a sanitized PDF copy")
-
-            Button {
-                showsOCRPanel.toggle()
-            } label: {
-                HStack(spacing: 7) {
-                    SPDFVIcon(session.isPerformingOCR ? .scanText : .scan)
-                    Text(session.isPerformingOCR ? "READING" : "OCR")
-                        .font(.system(size: 9, weight: .black, design: .monospaced))
-                        .tracking(0.8)
-                }
-                .foregroundStyle(session.isPerformingOCR ? SPDFVTheme.paleCobalt : SPDFVTheme.primaryText)
-                .padding(.horizontal, 10)
-                .frame(height: 30)
-                .overlay { Rectangle().stroke(SPDFVTheme.divider, lineWidth: 1) }
-            }
-            .buttonStyle(.plain)
-            .disabled(session.isPerformingOCR)
-            .popover(isPresented: $showsOCRPanel, arrowEdge: .top) {
-                OCRPanel(session: session, isPresented: $showsOCRPanel)
-            }
-            .help("Create a searchable PDF copy with on-device OCR")
-
-            Menu {
-                Button("Save") { session.save() }
-                    .disabled(!session.isDirty)
-                Button("Save As…", action: saveAs)
-            } label: {
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(session.isDirty ? Color.orange : SPDFVTheme.cobalt)
-                        .frame(width: 6, height: 6)
-                    Text(session.isDirty ? "UNSAVED" : "SAVED")
-                        .font(.system(size: 9, weight: .bold, design: .monospaced))
-                        .tracking(0.8)
-                }
-                .foregroundStyle(SPDFVTheme.primaryText)
-                .padding(.horizontal, 10)
-                .frame(height: 30)
-                .overlay { Rectangle().stroke(SPDFVTheme.divider, lineWidth: 1) }
-            }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .accessibilityLabel("Document save status")
-            .accessibilityValue(session.isDirty ? "Unsaved changes" : "Saved")
+        ViewThatFits(in: .horizontal) {
+            bench(compact: false).fixedSize(horizontal: true, vertical: false)
+            bench(compact: true)
         }
         .padding(.horizontal, 14)
-        .frame(height: 42)
+        .frame(maxWidth: .infinity, minHeight: 46, maxHeight: 46, alignment: .leading)
         .background(SPDFVTheme.navigatorInset)
         .overlay(alignment: .bottom) {
             Rectangle().fill(SPDFVTheme.divider).frame(height: 1)
         }
+    }
+
+    private func bench(compact: Bool) -> some View {
+        HStack(spacing: 8) {
+            WorkspaceModePicker(selection: $mode, compact: compact, select: selectMode)
+            divider
+            tools(compact: compact)
+            Spacer(minLength: 8)
+            saveStatus
+        }
+    }
+
+    @ViewBuilder
+    private func tools(compact: Bool) -> some View {
+        switch mode {
+        case .read:
+            readTools(compact: compact)
+        case .markup:
+            markupTools(compact: compact)
+        case .organize:
+            organizeTools(compact: compact)
+        case .automate:
+            automateTools(compact: compact)
+        }
+    }
+
+    @ViewBuilder
+    private func readTools(compact: Bool) -> some View {
+        if compact {
+            SquareToolButton(icon: .pages, help: "Show pages") { showNavigator(.pages) }
+            SquareToolButton(icon: .outline, help: "Show contents") { showNavigator(.outline) }
+            SquareToolButton(icon: .search, help: "Find in document") { showNavigator(.search) }
+        } else {
+            BenchButton("Pages", icon: .pages) { showNavigator(.pages) }
+            BenchButton("Contents", icon: .outline) { showNavigator(.outline) }
+            BenchButton("Find", icon: .search) { showNavigator(.search) }
+            status("Document ready")
+        }
+    }
+
+    @ViewBuilder
+    private func markupTools(compact: Bool) -> some View {
+        if compact {
+            markupMenu
+            SquareToolButton(icon: .back, help: session.undoMenuTitle) { session.undoLastEdit() }
+                .disabled(!session.canUndoEdit)
+            SquareToolButton(icon: .redo, help: session.redoMenuTitle) { session.redoLastEdit() }
+                .disabled(!session.canRedoEdit)
+            status(benchStatus)
+        } else {
+            ForEach(MarkupKind.allCases) { kind in
+                MarkupToolButton(kind: kind) { session.addMarkup(kind) }
+                    .disabled(!session.hasTextSelection)
+            }
+            divider
+            ForEach(CanvasAnnotationTool.quickTools) { tool in
+                CanvasToolButton(tool: tool, isSelected: session.activeAnnotationTool == tool) {
+                    session.setAnnotationTool(tool)
+                }
+            }
+            SquareToolButton(icon: .back, help: session.undoMenuTitle) { session.undoLastEdit() }
+                .disabled(!session.canUndoEdit)
+            SquareToolButton(icon: .redo, help: session.redoMenuTitle) { session.redoLastEdit() }
+                .disabled(!session.canRedoEdit)
+            status(benchStatus)
+        }
+    }
+
+    private var markupMenu: some View {
+        Menu {
+            Section("Selected text") {
+                ForEach(MarkupKind.allCases) { kind in
+                    Button(kind.label) { session.addMarkup(kind) }
+                        .disabled(!session.hasTextSelection)
+                }
+            }
+            Section("Place on page") {
+                ForEach(CanvasAnnotationTool.quickTools) { tool in
+                    Button(tool.label) { session.setAnnotationTool(tool) }
+                }
+            }
+        } label: {
+            HStack(spacing: 7) {
+                SPDFVIcon(session.activeAnnotationTool.icon)
+                Text(session.activeAnnotationTool.label)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+            }
+            .foregroundStyle(SPDFVTheme.primaryText)
+            .padding(.horizontal, 10)
+            .frame(height: 32)
+            .overlay { Rectangle().stroke(SPDFVTheme.divider, lineWidth: 1) }
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Choose a markup tool")
+    }
+
+    @ViewBuilder
+    private func organizeTools(compact: Bool) -> some View {
+        SquareToolButton(icon: .rotateLeft, help: "Rotate selected pages left") { session.rotateCurrentPage(clockwise: false) }
+        SquareToolButton(icon: .rotateRight, help: "Rotate selected pages right") { session.rotateCurrentPage(clockwise: true) }
+        if compact {
+            pageOperationsMenu
+        } else {
+            BenchButton("Duplicate", icon: .duplicate) { session.duplicateCurrentPage() }
+            BenchButton("Extract", icon: .extract) { session.extractCurrentPageFromPicker() }
+            BenchButton("Append PDF", icon: .insertPages) { session.appendPagesFromPicker() }
+            status(pageSelectionStatus)
+        }
+    }
+
+    private var pageOperationsMenu: some View {
+        Menu {
+            Button("Duplicate selected pages") { session.duplicateCurrentPage() }
+            Button("Extract selected pages…") { session.extractCurrentPageFromPicker() }
+            Button("Append PDF…") { session.appendPagesFromPicker() }
+        } label: {
+            SPDFVIcon(.controls)
+                .frame(width: 34, height: 34)
+                .contentShape(Rectangle())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .help("More page operations")
+        .accessibilityLabel("More page operations")
+    }
+
+    @ViewBuilder
+    private func automateTools(compact: Bool) -> some View {
+        if compact {
+            SquareToolButton(icon: .quickAction, help: "Open Recipe Press") { openRecipeWorkspace() }
+                .disabled(session.isRunningRecipe)
+            ocrButton(compact: true)
+            redactionButton(compact: true)
+            queueButton(compact: true)
+        } else {
+            BenchButton("Recipe Press", icon: .quickAction, active: session.loadedRecipe != nil) { openRecipeWorkspace() }
+                .disabled(session.isRunningRecipe)
+            ocrButton(compact: false)
+            redactionButton(compact: false)
+            queueButton(compact: false)
+        }
+    }
+
+    private func ocrButton(compact: Bool) -> some View {
+        Button { showsOCRPanel.toggle() } label: {
+            toolLabel(
+                compact: compact,
+                title: session.isPerformingOCR ? "Reading…" : "OCR",
+                icon: session.isPerformingOCR ? .scanText : .scan,
+                color: session.isPerformingOCR ? SPDFVTheme.paleCobalt : SPDFVTheme.primaryText
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(session.isPerformingOCR)
+        .popover(isPresented: $showsOCRPanel, arrowEdge: .top) {
+            OCRPanel(session: session, isPresented: $showsOCRPanel)
+        }
+        .help("Create a searchable PDF copy with on-device OCR")
+    }
+
+    private func redactionButton(compact: Bool) -> some View {
+        Button { showsRedactionGate.toggle() } label: {
+            toolLabel(
+                compact: compact,
+                title: "Redact",
+                icon: .region,
+                color: session.pendingRedactions.isEmpty ? SPDFVTheme.primaryText : SPDFVTheme.redaction
+            )
+            .overlay(alignment: .topTrailing) {
+                if !session.pendingRedactions.isEmpty {
+                    countBadge(session.pendingRedactions.count, color: SPDFVTheme.redaction)
+                        .offset(x: 4, y: -4)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(session.isSanitizingRedactions)
+        .popover(isPresented: $showsRedactionGate, arrowEdge: .top) {
+            RedactionGate(session: session, isPresented: $showsRedactionGate)
+        }
+        .accessibilityLabel("Redaction Gate")
+        .accessibilityValue("\(session.pendingRedactions.count) staged regions")
+        .help("Stage regions and create a sanitized PDF copy")
+    }
+
+    private func queueButton(compact: Bool) -> some View {
+        Button { openWindow(id: "processing-queue") } label: {
+            HStack(spacing: 7) {
+                SPDFVIcon(.queue)
+                if !compact {
+                    Text("Activity").font(.system(size: 11, weight: .semibold, design: .rounded))
+                }
+                if queueIssueCount > 0 {
+                    countBadge(
+                        queueIssueCount,
+                        color: automation.queue.summary.failed > 0 ? SPDFVTheme.redaction : SPDFVTheme.cobalt
+                    )
+                }
+            }
+            .foregroundStyle(automation.queue.summary.failed > 0 ? SPDFVTheme.redaction : SPDFVTheme.primaryText)
+            .padding(.horizontal, compact ? 0 : 10)
+            .frame(width: compact && queueIssueCount == 0 ? 34 : nil, height: 32)
+            .overlay { Rectangle().stroke(SPDFVTheme.divider, lineWidth: 1) }
+        }
+        .buttonStyle(.plain)
+        .help("Open the activity center")
+        .accessibilityLabel("Open activity center")
+    }
+
+    private func toolLabel(compact: Bool, title: String, icon: SPDFVIconName, color: Color) -> some View {
+        HStack(spacing: 7) {
+            SPDFVIcon(icon)
+            if !compact {
+                Text(title).font(.system(size: 11, weight: .semibold, design: .rounded))
+            }
+        }
+        .foregroundStyle(color)
+        .padding(.horizontal, compact ? 0 : 10)
+        .frame(width: compact ? 34 : nil, height: 32)
+        .overlay { Rectangle().stroke(SPDFVTheme.divider, lineWidth: 1) }
+    }
+
+    private func countBadge(_ count: Int, color: Color) -> some View {
+        Text("\(count)")
+            .font(.system(size: 7, weight: .black, design: .monospaced))
+            .foregroundStyle(Color.white)
+            .frame(minWidth: 14, minHeight: 14)
+            .background(color)
+            .clipShape(Circle())
+    }
+
+    private var saveStatus: some View {
+        Menu {
+            Button("Save") { session.save() }.disabled(!session.isDirty)
+            Button("Save As…", action: saveAs)
+        } label: {
+            HStack(spacing: 8) {
+                Circle().fill(session.isDirty ? Color.orange : SPDFVTheme.cobalt).frame(width: 6, height: 6)
+                Text(session.isDirty ? "Unsaved" : "Saved")
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+            }
+            .foregroundStyle(SPDFVTheme.primaryText)
+            .padding(.horizontal, 10)
+            .frame(height: 32)
+            .overlay { Rectangle().stroke(SPDFVTheme.divider, lineWidth: 1) }
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .accessibilityLabel("Document save status")
+        .accessibilityValue(session.isDirty ? "Unsaved changes" : "Saved")
+    }
+
+    private var divider: some View {
+        Rectangle().fill(SPDFVTheme.divider).frame(width: 1, height: 24).padding(.horizontal, 2)
+    }
+
+    private func status(_ text: String) -> some View {
+        Text(text.uppercased())
+            .font(.system(size: 8.5, weight: .bold, design: .monospaced))
+            .tracking(0.65)
+            .foregroundStyle(SPDFVTheme.tertiaryText)
+            .lineLimit(1)
+    }
+
+    private var queueIssueCount: Int {
+        automation.queue.summary.queued + automation.queue.summary.failed
+    }
+
+    private var pageSelectionStatus: String {
+        let count = max(1, session.selectedPageIndices.count)
+        return count == 1 ? "Current page" : "\(count) pages selected"
+    }
+
+    private func selectMode(_ newMode: DocumentWorkspaceMode) {
+        mode = newMode
+        if newMode == .organize { showNavigator(.pages) }
+    }
+
+    private func showNavigator(_ navigatorMode: NavigatorMode) {
+        session.thumbnailsVisible = true
+        session.navigatorMode = navigatorMode
+    }
+
+    private func openRecipeWorkspace() {
+        RecipeWorkspaceWindowManager.shared.open(for: session)
     }
 
     private var benchStatus: String {
@@ -589,7 +763,103 @@ private struct MarkupBench: View {
     }
 }
 
-private struct RecipePanel: View {
+private struct WorkspaceModePicker: View {
+    @Binding var selection: DocumentWorkspaceMode
+    let compact: Bool
+    let select: (DocumentWorkspaceMode) -> Void
+
+    var body: some View {
+        if compact {
+            Menu {
+                ForEach(DocumentWorkspaceMode.allCases) { mode in
+                    Button {
+                        select(mode)
+                    } label: {
+                        if mode == selection {
+                            SPDFVIconLabel(title: mode.label, icon: .check)
+                        } else {
+                            SPDFVIconLabel(title: mode.label, icon: mode.icon)
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 7) {
+                    SPDFVIcon(selection.icon)
+                    Text(selection.label)
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                }
+                .foregroundStyle(Color.white)
+                .padding(.horizontal, 11)
+                .frame(height: 32)
+                .background(SPDFVTheme.cobalt)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Workspace: \(selection.label)")
+            .accessibilityLabel("Document workspace")
+            .accessibilityValue(selection.label)
+        } else {
+            HStack(spacing: 0) {
+                ForEach(DocumentWorkspaceMode.allCases) { mode in
+                    Button {
+                        select(mode)
+                    } label: {
+                        HStack(spacing: 6) {
+                            SPDFVIcon(mode.icon, size: 11)
+                            Text(mode.label)
+                                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        }
+                        .foregroundStyle(mode == selection ? Color.white : SPDFVTheme.secondaryText)
+                        .padding(.horizontal, 10)
+                        .frame(height: 32)
+                        .background(mode == selection ? SPDFVTheme.cobalt : Color.clear)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(mode.label) workspace")
+                    .accessibilityValue(mode == selection ? "Selected" : "Not selected")
+                }
+            }
+            .overlay { Rectangle().stroke(SPDFVTheme.divider, lineWidth: 1) }
+        }
+    }
+}
+
+private struct BenchButton: View {
+    let title: String
+    let icon: SPDFVIconName
+    let active: Bool
+    let action: () -> Void
+
+    init(_ title: String, icon: SPDFVIconName, active: Bool = false, action: @escaping () -> Void) {
+        self.title = title
+        self.icon = icon
+        self.active = active
+        self.action = action
+    }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                SPDFVIcon(icon, size: 11)
+                Text(title)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(active ? SPDFVTheme.paleCobalt : SPDFVTheme.primaryText)
+            .padding(.horizontal, 10)
+            .frame(height: 32)
+            .overlay { Rectangle().stroke(active ? SPDFVTheme.cobalt : SPDFVTheme.divider, lineWidth: 1) }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(title)
+        .accessibilityLabel(title)
+    }
+}
+
+struct RecipePanel: View {
     @ObservedObject var session: DocumentSession
     @Binding var isPresented: Bool
     @ObservedObject private var library = RecipeLibraryStore.shared
@@ -617,7 +887,14 @@ private struct RecipePanel: View {
                 emptyState
             }
         }
-        .frame(width: isShowingLibrary ? 590 : (isComposing && session.loadedRecipe != nil ? 660 : 390))
+        .frame(
+            minWidth: 390,
+            idealWidth: isShowingLibrary ? 590 : (isComposing && session.loadedRecipe != nil ? 660 : 390),
+            maxWidth: .infinity,
+            minHeight: 430,
+            maxHeight: .infinity,
+            alignment: .top
+        )
         .background(SPDFVTheme.navigator)
         .animation(.snappy(duration: 0.22), value: isComposing)
         .alert("Remove recipe drawer?", isPresented: Binding(
@@ -2367,8 +2644,7 @@ private struct MarkupToolButton: View {
                 SPDFVIcon(kind.icon, size: 11)
                     .font(.system(size: 11, weight: .semibold))
                 Text(kind.label.uppercased())
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .tracking(0.5)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
             }
             .foregroundStyle(SPDFVTheme.primaryText)
             .padding(.horizontal, 9)
@@ -2397,8 +2673,7 @@ private struct CanvasToolButton: View {
                 SPDFVIcon(tool.icon, size: 11)
                     .font(.system(size: 11, weight: .semibold))
                 Text(tool.label.uppercased())
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .tracking(0.45)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
             }
             .foregroundStyle(isSelected ? Color.white : SPDFVTheme.primaryText)
             .padding(.horizontal, 8)

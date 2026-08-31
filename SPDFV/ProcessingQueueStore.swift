@@ -51,6 +51,7 @@ final class ProcessingQueueStore: ObservableObject {
         }
         let interruptedCount = queue.jobs.count { $0.status == .running }
         _ = queue.prepareForRun()
+        for job in queue.jobs { syncActivity(for: job) }
         if interruptedCount > 0 {
             notice = "Recovered \(interruptedCount) interrupted job\(interruptedCount == 1 ? "" : "s")"
             persistQueue()
@@ -86,12 +87,17 @@ final class ProcessingQueueStore: ObservableObject {
 
     func retry(_ id: UUID) {
         guard queue.retry(id) else { return }
+        if let job = queue.jobs.first(where: { $0.id == id }) { syncActivity(for: job) }
         persistQueue()
         notice = "Job returned to the queue"
     }
 
     func remove(_ id: UUID) {
+        let removedJob = queue.jobs.first { $0.id == id }
         guard queue.remove(id) else { return }
+        if let removedJob {
+            ActivityCenterStore.shared.cancel(id, detail: "Removed \(URL(fileURLWithPath: removedJob.inputPath).lastPathComponent) from the processing queue")
+        }
         access.removeValue(forKey: id.uuidString)
         persistQueue()
         persistAccess()
@@ -114,6 +120,7 @@ final class ProcessingQueueStore: ObservableObject {
         do {
             let imported = try JSONDecoder().decode(PDFRecipeJobQueue.self, from: Data(contentsOf: url))
             let count = try queue.merge(imported)
+            for job in queue.jobs { syncActivity(for: job) }
             persistQueue()
             notice = count == 0 ? "Queue already contains every imported job" : "Imported \(count) job\(count == 1 ? "" : "s") · relink access to run"
         } catch {
@@ -226,6 +233,7 @@ final class ProcessingQueueStore: ObservableObject {
             persistQueue()
             persistAccess()
             notice = "Queued \(input.lastPathComponent)"
+            if let job = queue.jobs.first(where: { $0.id == id }) { syncActivity(for: job) }
         } catch {
             notice = "Job could not be queued · \((error as? PDFOperationError)?.description ?? error.localizedDescription)"
         }
@@ -236,10 +244,12 @@ final class ProcessingQueueStore: ObservableObject {
         guard let record = access[id.uuidString] else {
             _ = queue.markRunning(id)
             _ = queue.markFailed(id, error: "File access is not linked. Relink the input, recipe, and output folder.")
+            if let failed = queue.jobs.first(where: { $0.id == id }) { syncActivity(for: failed) }
             persistQueue()
             return
         }
         guard queue.markRunning(id) else { return }
+        if let running = queue.jobs.first(where: { $0.id == id }) { syncActivity(for: running) }
         persistQueue()
 
         do {
@@ -266,8 +276,14 @@ final class ProcessingQueueStore: ObservableObject {
             }.value
             try result.data.write(to: output, options: .atomic)
             _ = queue.markPassed(id, report: result.report)
+            ActivityCenterStore.shared.finish(
+                id,
+                detail: "Exported \(result.report.outputPageCount) page\(result.report.outputPageCount == 1 ? "" : "s") after \(result.report.steps.count) verified step\(result.report.steps.count == 1 ? "" : "s")",
+                outputURL: output
+            )
         } catch {
             _ = queue.markFailed(id, error: (error as? PDFOperationError)?.description ?? error.localizedDescription)
+            ActivityCenterStore.shared.fail(id, detail: (error as? PDFOperationError)?.description ?? error.localizedDescription)
         }
         persistQueue()
     }
@@ -347,6 +363,32 @@ final class ProcessingQueueStore: ObservableObject {
               ((try? queue.applyExecutionUpdates(from: backgroundQueue)) ?? 0) > 0 else { return }
         guard let encoded = try? JSONEncoder().encode(queue) else { return }
         defaults.set(encoded, forKey: queueKey)
+        for job in queue.jobs { syncActivity(for: job) }
+    }
+
+    private func syncActivity(for job: PDFRecipeJob) {
+        let status: SPDFVActivityStatus = switch job.status {
+        case .queued: .queued
+        case .running: .running
+        case .passed: .succeeded
+        case .failed: .failed
+        }
+        let inputName = URL(fileURLWithPath: job.inputPath).lastPathComponent
+        let detail: String = switch job.status {
+        case .queued: "Waiting to run with \(URL(fileURLWithPath: job.recipePath).deletingPathExtension().lastPathComponent)"
+        case .running: "Applying the queued recipe"
+        case .passed: "Finished on attempt \(job.attempts)"
+        case .failed: job.error ?? "The queued recipe stopped"
+        }
+        ActivityCenterStore.shared.upsert(
+            id: job.id,
+            kind: .queue,
+            title: "Process \(inputName)",
+            detail: detail,
+            documentName: inputName,
+            status: status,
+            outputURL: job.status == .passed ? URL(fileURLWithPath: job.outputPath) : nil
+        )
     }
 
     private func startBackgroundTimer() {

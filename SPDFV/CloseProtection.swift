@@ -105,9 +105,10 @@ final class SPDFVApplicationDelegate: NSObject, NSApplicationDelegate {
 
 struct WindowCloseGuard: NSViewRepresentable {
     @ObservedObject var session: DocumentSession
+    var viewerActions: ViewerActions
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(session: session)
+        Coordinator(session: session, viewerActions: viewerActions)
     }
 
     func makeNSView(context: Context) -> WindowProbeView {
@@ -120,7 +121,9 @@ struct WindowCloseGuard: NSViewRepresentable {
 
     func updateNSView(_ nsView: WindowProbeView, context: Context) {
         context.coordinator.session = session
+        context.coordinator.viewerActions = viewerActions
         context.coordinator.attach(to: nsView.window)
+        context.coordinator.refreshActiveCommands()
     }
 
     static func dismantleNSView(_ nsView: WindowProbeView, coordinator: Coordinator) {
@@ -130,11 +133,13 @@ struct WindowCloseGuard: NSViewRepresentable {
     @MainActor
     final class Coordinator: NSObject, NSWindowDelegate {
         var session: DocumentSession
+        var viewerActions: ViewerActions
         private weak var window: NSWindow?
         private weak var originalDelegate: NSWindowDelegate?
 
-        init(session: DocumentSession) {
+        init(session: DocumentSession, viewerActions: ViewerActions) {
             self.session = session
+            self.viewerActions = viewerActions
         }
 
         func attach(to window: NSWindow?) {
@@ -150,6 +155,7 @@ struct WindowCloseGuard: NSViewRepresentable {
         }
 
         func detach() {
+            ViewerCommandCenter.shared.deactivate(session)
             if let window, window.delegate === self {
                 window.delegate = originalDelegate
             }
@@ -160,6 +166,21 @@ struct WindowCloseGuard: NSViewRepresentable {
         func windowShouldClose(_ sender: NSWindow) -> Bool {
             guard CloseProtectionCenter.shared.shouldClose(session) else { return false }
             return originalDelegate?.windowShouldClose?(sender) ?? true
+        }
+
+        func windowDidBecomeKey(_ notification: Notification) {
+            ViewerCommandCenter.shared.activate(viewerActions, for: session)
+            originalDelegate?.windowDidBecomeKey?(notification)
+        }
+
+        func windowDidResignKey(_ notification: Notification) {
+            ViewerCommandCenter.shared.deactivate(session)
+            originalDelegate?.windowDidResignKey?(notification)
+        }
+
+        func refreshActiveCommands() {
+            guard window?.isKeyWindow == true else { return }
+            ViewerCommandCenter.shared.activate(viewerActions, for: session)
         }
 
         override func responds(to aSelector: Selector!) -> Bool {

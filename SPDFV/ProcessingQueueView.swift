@@ -3,20 +3,26 @@ import SwiftUI
 
 struct ProcessingQueueView: View {
     @ObservedObject private var store = ProcessingQueueStore.shared
+    @ObservedObject private var activityStore = ActivityCenterStore.shared
     @State private var selection: UUID?
     @State private var filter = ProcessingQueueFilter.all
+    @State private var section = ActivityCenterSection.activity
 
     var body: some View {
         VStack(spacing: 0) {
             queueHeader
-            summaryBar
+            if section == .activity {
+                ActivityOverviewView()
+            } else {
+                summaryBar
 
-            HStack(spacing: 0) {
-                queueColumn
-                    .frame(minWidth: 340, idealWidth: 390, maxWidth: 440)
-                Rectangle().fill(SPDFVTheme.divider).frame(width: 1)
-                detailColumn
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                HStack(spacing: 0) {
+                    queueColumn
+                        .frame(minWidth: 340, idealWidth: 390, maxWidth: 440)
+                    Rectangle().fill(SPDFVTheme.divider).frame(width: 1)
+                    detailColumn
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
             }
         }
         .frame(minWidth: 860, minHeight: 590)
@@ -32,11 +38,11 @@ struct ProcessingQueueView: View {
                     SPDFVIcon(.automation)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(SPDFVTheme.paleCobalt)
-                    Text("PROCESSING QUEUE")
+                    Text("ACTIVITY CENTER")
                         .font(.system(size: 15, weight: .black, design: .monospaced))
                         .tracking(1.5)
                 }
-                Text("PDF JOBS  /  RUN HISTORY")
+                Text("DOCUMENT WORK  /  AUTOMATION LEDGER")
                     .font(.system(size: 8, weight: .bold, design: .monospaced))
                     .tracking(1.15)
                     .foregroundStyle(SPDFVTheme.navigatorMuted)
@@ -44,15 +50,27 @@ struct ProcessingQueueView: View {
 
             Spacer()
 
-            HStack(spacing: 7) {
-                QueueButton("IMPORT", icon: .save) { store.importQueue() }
-                QueueButton("EXPORT", icon: .share) { store.exportQueue() }
-                    .disabled(store.queue.jobs.isEmpty)
-                QueueButton("ADD JOB", icon: .add, prominent: false) { store.addJob() }
-                QueueButton(store.isRunning ? "RUNNING" : "RUN QUEUE", icon: store.isRunning ? .processing : .run, prominent: true) {
-                    store.runPending()
+            HStack(spacing: 4) {
+                ForEach(ActivityCenterSection.allCases) { item in
+                    Button(item.label) { section = item }
+                        .buttonStyle(QueueFilterButtonStyle(selected: section == item))
                 }
-                .disabled(store.isRunning || store.queue.summary.queued == 0)
+            }
+
+            HStack(spacing: 7) {
+                if section == .activity {
+                    QueueButton("CLEAR FINISHED", icon: .delete) { activityStore.clearFinished() }
+                        .disabled(!activityStore.records.contains(where: { $0.status.isTerminal }))
+                } else {
+                    QueueButton("IMPORT", icon: .save) { store.importQueue() }
+                    QueueButton("EXPORT", icon: .share) { store.exportQueue() }
+                        .disabled(store.queue.jobs.isEmpty)
+                    QueueButton("ADD JOB", icon: .add, prominent: false) { store.addJob() }
+                    QueueButton(store.isRunning ? "RUNNING" : "RUN QUEUE", icon: store.isRunning ? .processing : .run, prominent: true) {
+                        store.runPending()
+                    }
+                    .disabled(store.isRunning || store.queue.summary.queued == 0)
+                }
             }
         }
         .padding(.horizontal, 20)
@@ -240,6 +258,14 @@ struct ProcessingQueueView: View {
         if let selection, filteredJobs.contains(where: { $0.id == selection }) { return }
         selection = filteredJobs.first?.id
     }
+}
+
+private enum ActivityCenterSection: String, CaseIterable, Identifiable {
+    case activity
+    case queue
+
+    var id: Self { self }
+    var label: String { rawValue.uppercased() }
 }
 
 private struct AutomationJobRow: View {
