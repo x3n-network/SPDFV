@@ -1,6 +1,6 @@
 # SPDFV
 
-![SPDFV Command Index](Screenshots/spdfv-command-index.png)
+![SPDFV displaying NASA's Artemis lunar exploration plan](Screenshots/spdfv-workspace.png)
 
 SPDFV is a native PDF workspace for macOS. It opens quickly for ordinary reading, but keeps serious document work close at hand: annotations, page editing, forms, OCR, redaction, repeatable recipes, background jobs, and a command-line interface.
 
@@ -25,17 +25,19 @@ SPDFV is pre-release software. Keep an original copy of important documents whil
 
 ## Interface
 
-### Document workspace
+### Command Index
 
-![SPDFV document workspace in Markup mode](Screenshots/spdfv-workspace.png)
+![SPDFV Command Index over NASA's Artemis lunar exploration plan](Screenshots/spdfv-command-index.png)
 
-### Recipe Press
+### Markup workspace
 
-![SPDFV Recipe Press with a verified workflow](Screenshots/spdfv-recipe-press.png)
+![SPDFV Markup workspace displaying NASA's Artemis lunar exploration plan](Screenshots/spdfv-markup-workspace.png)
 
-### Activity Center
+### Interactive forms
 
-![SPDFV Activity Center showing completed document work](Screenshots/spdfv-activity-center.png)
+![SPDFV Fields workspace displaying a blank IRS Form W-9](Screenshots/spdfv-form-workspace.png)
+
+Screenshots use public documents from [NASA](https://ntrs.nasa.gov/citations/20240011013) and the [IRS](https://www.irs.gov/forms-pubs/about-form-w-9).
 
 ## Requirements
 
