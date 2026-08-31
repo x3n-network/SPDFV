@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>SPDFV Updates</title>
+        <link>https://github.com/x3n-network/SPDFV</link>
+        <description>Signed updates for SPDFV.</description>
+        <language>en</language>
+        <item>
+            <title>0.1.1</title>
+            <pubDate>Mon, 31 Aug 2026 15:14:44 -0400</pubDate>
+            <link>https://github.com/x3n-network/SPDFV/releases/tag/v0.1.1</link>
+            <sparkle:version>2</sparkle:version>
+            <sparkle:shortVersionString>0.1.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/x3n-network/SPDFV/releases/download/v0.1.1/SPDFV-0.1.1.dmg" sparkle:edSignature="RjMZbPDORSPTx3ecS3IKobq8+7e6b/0KRW4Ioj3YMBdQF4KU3Nb0TLXoCN0cJP520rd+FSRq/nHaJpudIUd+Dw==" length="6275812" type="application/octet-stream"/>
+        </item>
+    </channel>
+</rss>

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added signed in-app update checking and installation through Sparkle
+
 ## 0.1.1 - 2026-08-31
 
 - Added focused Read, Markup, Organize, and Automate workspaces with responsive controls

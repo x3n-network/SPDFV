@@ -10,6 +10,7 @@ import SwiftUI
 @main
 struct SPDFVApp: App {
     @NSApplicationDelegateAdaptor(SPDFVApplicationDelegate.self) private var applicationDelegate
+    private let updaterController = SPDFVUpdaterController()
 
     var body: some Scene {
         WindowGroup {
@@ -19,6 +20,9 @@ struct SPDFVApp: App {
         .windowToolbarStyle(.unified(showsTitle: true))
         .defaultSize(width: 1080, height: 760)
         .commands {
+            CommandGroup(after: .appInfo) {
+                CheckForUpdatesView(updater: updaterController.updater)
+            }
             SPDFVCommands()
         }
 

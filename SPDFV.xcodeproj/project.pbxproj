@@ -10,7 +10,8 @@
 		A1B2C3D4E5F6000000000001 /* SPDFVCore in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D4E5F6000000000003 /* SPDFVCore */; };
 		D10000000000000000000002 /* SPDFVCore in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D4E5F6000000000003 /* SPDFVCore */; };
 		D10000000000000000000003 /* SPDFVQueueRunner in Copy Queue Runner */ = {isa = PBXBuildFile; fileRef = D10000000000000000000001 /* SPDFVQueueRunner */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
-		D10000000000000000000005 /* com.x3nllc.SPDFV.QueueRunner.plist in Copy Launch Agent */ = {isa = PBXBuildFile; fileRef = D10000000000000000000004 /* com.x3nllc.SPDFV.QueueRunner.plist */; };
+		D10000000000000000000005 /* SPDFV/com.x3nllc.SPDFV.QueueRunner.plist in Copy Launch Agent */ = {isa = PBXBuildFile; fileRef = D10000000000000000000004 /* SPDFV/com.x3nllc.SPDFV.QueueRunner.plist */; };
+		E20000000000000000000001 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = E20000000000000000000002 /* Sparkle */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -41,7 +42,7 @@
 			dstPath = Contents/Library/LaunchAgents;
 			dstSubfolderSpec = 1;
 			files = (
-				D10000000000000000000005 /* com.x3nllc.SPDFV.QueueRunner.plist in Copy Launch Agent */,
+				D10000000000000000000005 /* SPDFV/com.x3nllc.SPDFV.QueueRunner.plist in Copy Launch Agent */,
 			);
 			name = "Copy Launch Agent";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -51,26 +52,21 @@
 /* Begin PBXFileReference section */
 		C9F489313043730A00732C4A /* SPDFV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SPDFV.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D10000000000000000000001 /* SPDFVQueueRunner */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = SPDFVQueueRunner; sourceTree = BUILT_PRODUCTS_DIR; };
-		D10000000000000000000004 /* com.x3nllc.SPDFV.QueueRunner.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = SPDFV/com.x3nllc.SPDFV.QueueRunner.plist; sourceTree = SOURCE_ROOT; };
+		D10000000000000000000004 /* SPDFV/com.x3nllc.SPDFV.QueueRunner.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = SPDFV/com.x3nllc.SPDFV.QueueRunner.plist; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
 		C9F489403043730B00732C4A /* Exceptions for "SPDFV" folder in "SPDFV" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Info.plist,
 				com.x3nllc.SPDFV.QueueRunner.plist,
+				Info.plist,
 			);
 			target = C9F489303043730A00732C4A /* SPDFV */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		D10000000000000000000006 /* QueueRunner */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = QueueRunner;
-			sourceTree = "<group>";
-		};
 		C9F489333043730A00732C4A /* SPDFV */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -79,22 +75,28 @@
 			path = SPDFV;
 			sourceTree = "<group>";
 		};
+		D10000000000000000000006 /* QueueRunner */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = QueueRunner;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		D10000000000000000000012 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				D10000000000000000000002 /* SPDFVCore in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		C9F4892E3043730A00732C4A /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				A1B2C3D4E5F6000000000001 /* SPDFVCore in Frameworks */,
+				E20000000000000000000001 /* Sparkle in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D10000000000000000000012 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D10000000000000000000002 /* SPDFVCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -107,6 +109,7 @@
 				C9F489333043730A00732C4A /* SPDFV */,
 				D10000000000000000000006 /* QueueRunner */,
 				C9F489323043730A00732C4A /* Products */,
+				C9F48A303046078E00732C4A /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -119,9 +122,44 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		C9F48A303046078E00732C4A /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				D10000000000000000000004 /* SPDFV/com.x3nllc.SPDFV.QueueRunner.plist */,
+			);
+			name = "Recovered References";
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		C9F489303043730A00732C4A /* SPDFV */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C9F4893C3043730B00732C4A /* Build configuration list for PBXNativeTarget "SPDFV" */;
+			buildPhases = (
+				C9F4892D3043730A00732C4A /* Sources */,
+				C9F4892E3043730A00732C4A /* Frameworks */,
+				C9F4892F3043730A00732C4A /* Resources */,
+				D10000000000000000000018 /* Copy Queue Runner */,
+				D10000000000000000000019 /* Copy Launch Agent */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D10000000000000000000017 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				C9F489333043730A00732C4A /* SPDFV */,
+			);
+			name = SPDFV;
+			packageProductDependencies = (
+				A1B2C3D4E5F6000000000003 /* SPDFVCore */,
+				E20000000000000000000002 /* Sparkle */,
+			);
+			productName = SPDFV;
+			productReference = C9F489313043730A00732C4A /* SPDFV.app */;
+			productType = "com.apple.product-type.application";
+		};
 		D10000000000000000000010 /* SPDFVQueueRunner */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = D10000000000000000000015 /* Build configuration list for PBXNativeTarget "SPDFVQueueRunner" */;
@@ -144,32 +182,6 @@
 			productReference = D10000000000000000000001 /* SPDFVQueueRunner */;
 			productType = "com.apple.product-type.tool";
 		};
-		C9F489303043730A00732C4A /* SPDFV */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = C9F4893C3043730B00732C4A /* Build configuration list for PBXNativeTarget "SPDFV" */;
-			buildPhases = (
-				C9F4892D3043730A00732C4A /* Sources */,
-				C9F4892E3043730A00732C4A /* Frameworks */,
-				C9F4892F3043730A00732C4A /* Resources */,
-				D10000000000000000000018 /* Copy Queue Runner */,
-				D10000000000000000000019 /* Copy Launch Agent */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				D10000000000000000000017 /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				C9F489333043730A00732C4A /* SPDFV */,
-			);
-			name = SPDFV;
-			packageProductDependencies = (
-				A1B2C3D4E5F6000000000003 /* SPDFVCore */,
-			);
-			productName = SPDFV;
-			productReference = C9F489313043730A00732C4A /* SPDFV.app */;
-			productType = "com.apple.product-type.application";
-		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -180,10 +192,10 @@
 				LastSwiftUpdateCheck = 2660;
 				LastUpgradeCheck = 2660;
 				TargetAttributes = {
-					D10000000000000000000010 = {
+					C9F489303043730A00732C4A = {
 						CreatedOnToolsVersion = 26.6;
 					};
-					C9F489303043730A00732C4A = {
+					D10000000000000000000010 = {
 						CreatedOnToolsVersion = 26.6;
 					};
 				};
@@ -197,11 +209,12 @@
 			);
 			mainGroup = C9F489283043730A00732C4A;
 			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
-			productRefGroup = C9F489323043730A00732C4A /* Products */;
 			packageReferences = (
 				A1B2C3D4E5F6000000000002 /* XCLocalSwiftPackageReference "Core" */,
+				C9F48A5F304607FC00732C4A /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = C9F489323043730A00732C4A /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -222,14 +235,14 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		D10000000000000000000011 /* Sources */ = {
+		C9F4892D3043730A00732C4A /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		C9F4892D3043730A00732C4A /* Sources */ = {
+		D10000000000000000000011 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -247,42 +260,6 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		D10000000000000000000013 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
-				DEVELOPMENT_TEAM = HT5B666N35;
-				ENABLE_APP_SANDBOX = NO;
-				ENABLE_HARDENED_RUNTIME = YES;
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.1.1;
-				PRODUCT_BUNDLE_IDENTIFIER = com.x3nllc.SPDFV.QueueRunner;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = macosx;
-				SKIP_INSTALL = YES;
-				SWIFT_VERSION = 5.0;
-			};
-			name = Debug;
-		};
-		D10000000000000000000014 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
-				DEVELOPMENT_TEAM = HT5B666N35;
-				ENABLE_APP_SANDBOX = NO;
-				ENABLE_HARDENED_RUNTIME = YES;
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.1.1;
-				PRODUCT_BUNDLE_IDENTIFIER = com.x3nllc.SPDFV.QueueRunner;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = macosx;
-				SKIP_INSTALL = YES;
-				SWIFT_VERSION = 5.0;
-			};
-			name = Release;
-		};
 		C9F4893A3043730B00732C4A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -408,6 +385,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = SPDFV.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 2;
@@ -443,6 +421,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = SPDFV.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 2;
@@ -473,18 +452,45 @@
 			};
 			name = Release;
 		};
+		D10000000000000000000013 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = HT5B666N35;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.x3nllc.SPDFV.QueueRunner;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		D10000000000000000000014 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = HT5B666N35;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.x3nllc.SPDFV.QueueRunner;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		D10000000000000000000015 /* Build configuration list for PBXNativeTarget "SPDFVQueueRunner" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				D10000000000000000000013 /* Debug */,
-				D10000000000000000000014 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		C9F4892C3043730A00732C4A /* Build configuration list for PBXProject "SPDFV" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -503,6 +509,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		D10000000000000000000015 /* Build configuration list for PBXNativeTarget "SPDFVQueueRunner" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D10000000000000000000013 /* Debug */,
+				D10000000000000000000014 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -512,11 +527,27 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		C9F48A5F304607FC00732C4A /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.9.6;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		A1B2C3D4E5F6000000000003 /* SPDFVCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = A1B2C3D4E5F6000000000002 /* XCLocalSwiftPackageReference "Core" */;
 			productName = SPDFVCore;
+		};
+		E20000000000000000000002 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C9F48A5F304607FC00732C4A /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -117,5 +117,11 @@ spctl --assess --type open --context context:primary-signature --verbose=4 "$dmg
     shasum -a 256 "$dmg_name" > "$dmg_name.sha256"
 )
 
+if [[ "${GENERATE_SPARKLE_APPCAST:-1}" == "1" ]]; then
+    bash "$project_root/Scripts/generate_appcast.sh" "$version" "$dmg_path"
+else
+    echo "Skipping Sparkle appcast generation."
+fi
+
 echo "Release artifact ready: $dmg_path"
 echo "Checksum: $checksum_path"
