@@ -1,0 +1,33 @@
+name: Build and test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  macos:
+    runs-on: macos-26
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Audit visual assets
+        run: bash Scripts/audit_visual_assets.sh
+
+      - name: Test shared core
+        run: swift test --package-path Core
+
+      - name: Build CLI
+        run: swift build --package-path CLI -c release
+
+      - name: Build app without signing
+        run: >-
+          xcodebuild
+          -project SPDFV.xcodeproj
+          -scheme SPDFV
+          -configuration Debug
+          -destination 'platform=macOS'
+          CODE_SIGNING_ALLOWED=NO
+          build
