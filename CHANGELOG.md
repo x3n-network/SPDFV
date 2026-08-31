@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.2 - 2026-08-31
+
 - Added signed in-app update checking and installation through Sparkle
 
 ## 0.1.1 - 2026-08-31
