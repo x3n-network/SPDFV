@@ -299,6 +299,53 @@ final class SPDFVCoreTests: XCTestCase {
         XCTAssertTrue(result.report.isInteractive)
     }
 
+    func testFormDataExportValidationAndAtomicApply() throws {
+        let document = makeDocument(pageNumbers: [1])
+        _ = try PDFOperations.addFormField(
+            PDFFormFieldDraft(name: "full_name", kind: .text, value: "Ada"),
+            to: document,
+            pageIndex: 0,
+            bounds: CGRect(x: 72, y: 580, width: 200, height: 28)
+        )
+        _ = try PDFOperations.addFormField(
+            PDFFormFieldDraft(name: "status", kind: .choice, value: "Draft", choices: ["Draft", "Approved"]),
+            to: document,
+            pageIndex: 0,
+            bounds: CGRect(x: 72, y: 530, width: 200, height: 28)
+        )
+        let normalized = try PDFOperations.normalizeFormData(try XCTUnwrap(document.dataRepresentation()))
+        let reopened = try XCTUnwrap(PDFDocument(data: normalized.data))
+
+        let exported = try PDFOperations.formData(for: reopened)
+        XCTAssertEqual(exported.version, 1)
+        XCTAssertEqual(exported.fields.map(\.name), ["full_name", "status"])
+        XCTAssertEqual(try PDFOperations.decodeFormData(PDFOperations.encodeFormData(exported)), exported)
+
+        let invalid = PDFFormDataFile(fields: [
+            PDFFormDataEntry(name: "full_name", value: "Grace"),
+            PDFFormDataEntry(name: "status", value: "Unknown"),
+            PDFFormDataEntry(name: "missing", value: "Private value")
+        ])
+        let invalidReport = PDFOperations.validateFormData(invalid, for: reopened)
+        XCTAssertFalse(invalidReport.canApply)
+        XCTAssertEqual(invalidReport.updatedFields, ["full_name"])
+        XCTAssertEqual(invalidReport.issues.map(\.kind), [.missing, .invalidChoice])
+        XCTAssertThrowsError(try PDFOperations.applyFormData(invalid, to: reopened))
+        XCTAssertEqual(PDFOperations.formReport(for: reopened).fields.first { $0.name == "full_name" }?.value, "Ada")
+        XCTAssertFalse(String(decoding: try JSONEncoder().encode(invalidReport), as: UTF8.self).contains("Private value"))
+
+        let valid = PDFFormDataFile(fields: [
+            PDFFormDataEntry(name: "full_name", value: "Grace"),
+            PDFFormDataEntry(name: "status", value: "Approved")
+        ])
+        let applied = try PDFOperations.applyFormData(valid, to: reopened)
+        XCTAssertTrue(applied.canApply)
+        XCTAssertEqual(applied.updatedFields, ["full_name", "status"])
+        let values = Dictionary(uniqueKeysWithValues: PDFOperations.formReport(for: reopened).fields.map { ($0.name, $0.value) })
+        XCTAssertEqual(values["full_name"], "Grace")
+        XCTAssertEqual(values["status"], "Approved")
+    }
+
     func testFormAuthoringCreatesCanonicalInteractiveFields() throws {
         let document = PDFDocument()
         let page = PDFPage()

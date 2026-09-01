@@ -8,6 +8,9 @@ CLI/.build/release/spdfv inspect document.pdf --pretty
 CLI/.build/release/spdfv annotations document.pdf --pages all --pretty
 CLI/.build/release/spdfv forms intake.pdf --pretty
 CLI/.build/release/spdfv form-gate intake.pdf --pretty
+CLI/.build/release/spdfv export-form-data intake.pdf --output intake-values.json --pretty
+CLI/.build/release/spdfv validate-form-data intake.pdf --data completed-values.json --pretty
+CLI/.build/release/spdfv import-form-data intake.pdf --data completed-values.json --output completed.pdf --pretty
 CLI/.build/release/spdfv safety-gate intake.pdf --pretty
 CLI/.build/release/spdfv safe-share review-copy.pdf --pretty
 CLI/.build/release/spdfv compare approved.pdf working-copy.pdf --pretty
@@ -48,6 +51,8 @@ Page specifications are one-based, accept comma-separated inclusive ranges, and 
 `add-field` authors a new text, checkbox, or choice field at PDF point coordinates. Choice options are comma separated. Field names must be unique, bounds must remain on the selected page, and the command normalizes and verifies the resulting interactive form before writing it. Certificate-backed signature fields remain a separate signing milestone.
 
 `rename-field` updates a logical field name across every repeated widget, rejects collisions, normalizes the canonical field tree, and verifies appearances before writing the output.
+
+Form Data Studio files are versioned JSON containing writable field names and values. `export-form-data` deliberately exports private values, `validate-form-data` reports missing, duplicate, read-only, unsupported, conflicting, and invalid-choice fields without echoing their values, and `import-form-data` writes only after the complete file passes validation. The native Fields → Data workbench uses the same contract and applies a valid import as one undoable edit.
 
 ## Recipes
 

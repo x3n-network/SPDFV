@@ -106,6 +106,29 @@ private struct FormGateInspectionReport: Encodable {
     let gate: PDFFormGateReport
 }
 
+private struct FormDataExportOperationReport: Encodable {
+    let operation: String
+    let input: String
+    let output: String
+    let fields: Int
+}
+
+private struct FormDataValidationOperationReport: Encodable {
+    let operation: String
+    let input: String
+    let data: String
+    let report: PDFFormDataValidationReport
+}
+
+private struct FormDataImportOperationReport: Encodable {
+    let operation: String
+    let input: String
+    let data: String
+    let output: String
+    let validation: PDFFormDataValidationReport
+    let report: PDFFormReport
+}
+
 private struct SafetyGateInspectionReport: Encodable {
     let input: String
     let gate: PDFSafetyGateReport
@@ -345,6 +368,89 @@ private func formGate(_ arguments: [String]) throws {
     let document = try PDFOperations.open(url)
     print(try encode(
         FormGateInspectionReport(input: url.path, gate: PDFOperations.formGate(for: document)),
+        pretty: parser.flags.contains("--pretty")
+    ))
+}
+
+private func exportFormData(_ arguments: [String]) throws {
+    let parser = try OptionParser(arguments)
+    try parser.rejectUnknownOptions(allowing: ["--output"])
+    guard parser.positional.count == 1 else {
+        throw CLIError.usage("export-form-data requires exactly one input PDF")
+    }
+    let inputURL = fileURL(parser.positional[0])
+    let outputURL = fileURL(try parser.requireOption("--output"))
+    if FileManager.default.fileExists(atPath: outputURL.path), !parser.flags.contains("--force") {
+        throw CLIError.failure("Output already exists; pass --force to replace it: \(outputURL.path)")
+    }
+    let document = try PDFOperations.open(inputURL)
+    let dataFile = try PDFOperations.formData(for: document)
+    try PDFOperations.encodeFormData(dataFile).write(to: outputURL, options: .atomic)
+    print(try encode(
+        FormDataExportOperationReport(
+            operation: "export-form-data",
+            input: inputURL.path,
+            output: outputURL.path,
+            fields: dataFile.fields.count
+        ),
+        pretty: parser.flags.contains("--pretty")
+    ))
+}
+
+private func validateFormData(_ arguments: [String]) throws {
+    let parser = try OptionParser(arguments)
+    try parser.rejectUnknownOptions(allowing: ["--data"])
+    guard parser.positional.count == 1 else {
+        throw CLIError.usage("validate-form-data requires exactly one input PDF")
+    }
+    let inputURL = fileURL(parser.positional[0])
+    let dataURL = fileURL(try parser.requireOption("--data"))
+    let document = try PDFOperations.open(inputURL)
+    let dataFile = try PDFOperations.decodeFormData(Data(contentsOf: dataURL))
+    print(try encode(
+        FormDataValidationOperationReport(
+            operation: "validate-form-data",
+            input: inputURL.path,
+            data: dataURL.path,
+            report: PDFOperations.validateFormData(dataFile, for: document)
+        ),
+        pretty: parser.flags.contains("--pretty")
+    ))
+}
+
+private func importFormData(_ arguments: [String]) throws {
+    let parser = try OptionParser(arguments)
+    try parser.rejectUnknownOptions(allowing: ["--data", "--output"])
+    guard parser.positional.count == 1 else {
+        throw CLIError.usage("import-form-data requires exactly one input PDF")
+    }
+    let inputURL = fileURL(parser.positional[0])
+    let dataURL = fileURL(try parser.requireOption("--data"))
+    let outputURL = fileURL(try parser.requireOption("--output"))
+    if FileManager.default.fileExists(atPath: outputURL.path), !parser.flags.contains("--force") {
+        throw CLIError.failure("Output already exists; pass --force to replace it: \(outputURL.path)")
+    }
+    let input = try Data(contentsOf: inputURL)
+    let document = try PDFOperations.open(inputURL)
+    let dataFile = try PDFOperations.decodeFormData(Data(contentsOf: dataURL))
+    let validation = PDFOperations.validateFormData(dataFile, for: document)
+    guard validation.canApply else {
+        throw CLIError.failure("Form data validation failed for: \(validation.issues.map(\.name).joined(separator: ", "))")
+    }
+    let result = try PDFOperations.fillForm(data: input, formData: dataFile)
+    guard let outputDocument = PDFDocument(data: result.data) else {
+        throw CLIError.failure("The imported form could not be reopened")
+    }
+    try PDFOperations.write(outputDocument, to: outputURL, overwrite: parser.flags.contains("--force"))
+    print(try encode(
+        FormDataImportOperationReport(
+            operation: "import-form-data",
+            input: inputURL.path,
+            data: dataURL.path,
+            output: outputURL.path,
+            validation: validation,
+            report: result.report
+        ),
         pretty: parser.flags.contains("--pretty")
     ))
 }
@@ -1096,6 +1202,9 @@ USAGE
   spdfv annotations <input.pdf> [--pages <spec>] [--pretty]
   spdfv forms <input.pdf> [--pretty]
   spdfv form-gate <input.pdf> [--pretty]
+  spdfv export-form-data <input.pdf> --output <data.json> [--force] [--pretty]
+  spdfv validate-form-data <input.pdf> --data <data.json> [--pretty]
+  spdfv import-form-data <input.pdf> --data <data.json> --output <output.pdf> [--force] [--pretty]
   spdfv safety-gate <input.pdf> [--pretty]
   spdfv safe-share <input.pdf> [--pretty]
   spdfv compare <reference.pdf> <candidate.pdf> [--pretty]
@@ -1138,6 +1247,9 @@ do {
     case "annotations": try annotations(Array(arguments.dropFirst()))
     case "forms": try forms(Array(arguments.dropFirst()))
     case "form-gate": try formGate(Array(arguments.dropFirst()))
+    case "export-form-data": try exportFormData(Array(arguments.dropFirst()))
+    case "validate-form-data": try validateFormData(Array(arguments.dropFirst()))
+    case "import-form-data": try importFormData(Array(arguments.dropFirst()))
     case "safety-gate": try safetyGate(Array(arguments.dropFirst()))
     case "safe-share": try safeShare(Array(arguments.dropFirst()))
     case "compare": try compare(Array(arguments.dropFirst()))

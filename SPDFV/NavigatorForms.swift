@@ -45,6 +45,8 @@ struct FormsNavigator: View {
                 )
             } else if workbench == .sign {
                 signaturePlate
+            } else if workbench == .data {
+                FormDataStudioPlate(session: session)
             }
 
             HStack {
@@ -214,7 +216,71 @@ private enum FieldWorkbenchMode: String, CaseIterable, Identifiable {
     case fill
     case build
     case sign
+    case data
     var id: Self { self }
+}
+
+private struct FormDataStudioPlate: View {
+    @ObservedObject var session: DocumentSession
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack {
+                Text("FORM DATA STUDIO")
+                Spacer()
+                Text("JSON V1")
+            }
+            .font(.system(size: 9, weight: .black, design: .monospaced))
+            .tracking(0.9)
+            .foregroundStyle(SPDFVTheme.navigatorFaint)
+
+            if let validation = session.formDataValidation {
+                Text(session.formDataFileName ?? "Imported data")
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(SPDFVTheme.navigatorText)
+                    .lineLimit(1)
+                Text("\(validation.matchedFields) MATCHED · \(validation.updatedFields.count) UPDATE · \(validation.unchangedFields.count) SAME")
+                    .font(.system(size: 8, weight: .black, design: .monospaced))
+                    .foregroundStyle(validation.canApply ? SPDFVTheme.paleCobalt : SPDFVTheme.redaction)
+                ForEach(validation.issues.prefix(3)) { issue in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(issue.kind.rawValue.uppercased()) / \(issue.name)")
+                            .font(.system(size: 8, weight: .black, design: .monospaced))
+                            .foregroundStyle(SPDFVTheme.redaction)
+                        Text(issue.detail)
+                            .font(.system(size: 8, design: .monospaced))
+                            .foregroundStyle(SPDFVTheme.navigatorMuted)
+                    }
+                }
+                HStack(spacing: 7) {
+                    Button("CLEAR", action: session.clearPendingFormData)
+                        .buttonStyle(SidebarButtonStyle(prominent: false))
+                    Button("APPLY DATA", action: session.applyPendingFormData)
+                        .buttonStyle(SidebarButtonStyle(prominent: true))
+                        .disabled(!validation.canApply || validation.updatedFields.isEmpty)
+                        .accessibilityIdentifier("form-data.apply")
+                }
+            } else {
+                Text("Import validates every field before editing. Export writes current values and may contain private information.")
+                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                    .foregroundStyle(SPDFVTheme.navigatorMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack(spacing: 7) {
+                Button("IMPORT JSON", action: session.importFormDataFromPicker)
+                    .buttonStyle(SidebarButtonStyle(prominent: true))
+                    .accessibilityIdentifier("form-data.import")
+                Button("EXPORT VALUES", action: session.exportFormDataFromPicker)
+                    .buttonStyle(SidebarButtonStyle(prominent: false))
+                    .disabled(session.formFields.isEmpty)
+                    .accessibilityIdentifier("form-data.export")
+            }
+        }
+        .padding(12)
+        .background(SPDFVTheme.navigatorInset)
+        .overlay(alignment: .bottom) { Rectangle().fill(SPDFVTheme.divider).frame(height: 1) }
+    }
 }
 
 private struct FieldDraftingPlate: View {

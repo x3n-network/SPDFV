@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added Form Data Studio for versioned JSON value export, privacy-conscious import validation, atomic native apply/undo, and CLI automation
 - Added privacy-conscious PDF Compare across Core, CLI, and the native Info workspace, with per-page appearance, text, geometry, rotation, annotation, and form change signals
 - Added backward-compatible Recipe v2 plates for page duplication, page deletion, OCR, and Safe Share assertions, with automatic schema upgrade in Recipe Press
 - Added a privacy-preserving Safe Share audit for metadata, review annotations, filled form fields, attachments, encryption, and signature fields across Core, CLI, and the native document inspector

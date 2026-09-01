@@ -340,6 +340,53 @@ final class SPDFVCLIIntegrationTests: XCTestCase {
         }
     }
 
+    func testFormDataExportValidateAndImportJourney() throws {
+        try withFixtureDirectory { directory in
+            let input = directory.appendingPathComponent("input.pdf")
+            let authored = directory.appendingPathComponent("authored.pdf")
+            let exported = directory.appendingPathComponent("values.json")
+            let importedData = directory.appendingPathComponent("updated.json")
+            let filled = directory.appendingPathComponent("filled.pdf")
+            try makeCompatibilityFixture().write(to: input)
+
+            let author = try runCLI([
+                "add-field", input.path, "--page", "1", "--type", "text",
+                "--name", "full_name", "--value", "Ada", "--bounds", "72,520,220,32",
+                "--output", authored.path
+            ])
+            XCTAssertEqual(author.status, 0, author.stderr)
+
+            let export = try runCLI([
+                "export-form-data", authored.path, "--output", exported.path, "--pretty"
+            ])
+            XCTAssertEqual(export.status, 0, export.stderr)
+            XCTAssertEqual(try jsonObject(export.stdout)["fields"] as? Int, 1)
+            let exportedJSON = try jsonObject(String(decoding: Data(contentsOf: exported), as: UTF8.self))
+            XCTAssertEqual(exportedJSON["version"] as? Int, 1)
+
+            let update = #"{"version":1,"fields":[{"name":"full_name","value":"Grace"}]}"#
+            try XCTUnwrap(update.data(using: .utf8)).write(to: importedData)
+            let validation = try runCLI([
+                "validate-form-data", authored.path, "--data", importedData.path, "--pretty"
+            ])
+            XCTAssertEqual(validation.status, 0, validation.stderr)
+            let validationReport = try XCTUnwrap(try jsonObject(validation.stdout)["report"] as? [String: Any])
+            XCTAssertEqual(validationReport["canApply"] as? Bool, true)
+            XCTAssertEqual(validationReport["updatedFields"] as? [String], ["full_name"])
+
+            let imported = try runCLI([
+                "import-form-data", authored.path, "--data", importedData.path,
+                "--output", filled.path, "--pretty"
+            ])
+            XCTAssertEqual(imported.status, 0, imported.stderr)
+            let forms = try runCLI(["forms", filled.path, "--pretty"])
+            XCTAssertEqual(forms.status, 0, forms.stderr)
+            let formReport = try XCTUnwrap(try jsonObject(forms.stdout)["report"] as? [String: Any])
+            let fields = try XCTUnwrap(formReport["fields"] as? [[String: Any]])
+            XCTAssertEqual(fields.first { $0["name"] as? String == "full_name" }?["value"] as? String, "Grace")
+        }
+    }
+
     func testCheckedInCompatibilityCorpusMatchesManifest() throws {
         let corpus = packageRootURL().deletingLastPathComponent()
             .appendingPathComponent("CompatibilityCorpus", isDirectory: true)

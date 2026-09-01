@@ -163,6 +163,30 @@ final class DocumentSessionTests: XCTestCase {
         XCTAssertEqual(widget.widgetStringValue, "Ada")
     }
 
+    func testFormDataStudioAppliesAsOneUndoableTransaction() throws {
+        let fixture = try makePDF(pageCount: 1, formFieldName: "applicant.name")
+        defer { try? FileManager.default.removeItem(at: fixture) }
+
+        let session = DocumentSession()
+        session.open(fixture)
+        let file = PDFFormDataFile(fields: [PDFFormDataEntry(name: "applicant.name", value: "Grace")])
+        session.pendingFormData = file
+        session.formDataValidation = PDFOperations.validateFormData(file, for: try XCTUnwrap(session.document))
+
+        session.applyPendingFormData()
+
+        let widget = try XCTUnwrap(session.document?.page(at: 0)?.annotations.first)
+        XCTAssertEqual(widget.widgetStringValue, "Grace")
+        XCTAssertEqual(session.undoActionName, "Import Form Data")
+        XCTAssertEqual(session.formDataValidation?.updatedFields, [])
+        XCTAssertEqual(session.formDataValidation?.unchangedFields, ["applicant.name"])
+
+        session.undoLastEdit()
+        XCTAssertEqual(widget.widgetStringValue ?? "", "")
+        session.redoLastEdit()
+        XCTAssertEqual(widget.widgetStringValue, "Grace")
+    }
+
     func testUnsavedDocumentDefersReplacementUntilResolved() throws {
         let first = try makePDF(pageCount: 1)
         let second = try makePDF(pageCount: 2)

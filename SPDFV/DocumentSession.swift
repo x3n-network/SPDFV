@@ -37,6 +37,9 @@ final class DocumentSession: ObservableObject {
     @Published var annotationRecords: [AnnotationRecord] = []
     @Published var formFields: [PDFFormFieldReport] = []
     @Published var formGate: PDFFormGateReport?
+    @Published var pendingFormData: PDFFormDataFile?
+    @Published var formDataValidation: PDFFormDataValidationReport?
+    @Published var formDataFileName: String?
     @Published var selectedFormField: FormFieldSelection?
     @Published var loadedRecipe: PDFRecipe?
     @Published var loadedRecipeName: String?
@@ -203,6 +206,9 @@ final class DocumentSession: ObservableObject {
         lastRedactionReport = nil
         selectedAnnotation = nil
         selectedFormField = nil
+        pendingFormData = nil
+        formDataValidation = nil
+        formDataFileName = nil
         markClean()
         hasTextSelection = false
         errorMessage = nil

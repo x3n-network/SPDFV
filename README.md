@@ -14,6 +14,7 @@ The interface is deliberately compact. It is not a web view in a desktop shell, 
 - Highlight, underline, strike, draw, add notes, and place signatures
 - Reorder, rotate, duplicate, extract, append, crop, and delete pages
 - Inspect, fill, create, rename, and validate interactive form fields
+- Exchange form values through a versioned JSON Data Studio with preflight validation and atomic undo
 - Preflight document protections and unlock password-protected PDFs without retaining the password
 - Audit metadata, review annotations, filled forms, attachments, and signatures before sharing without copying private values into the report
 - Compare a working PDF with a reference using page-by-page appearance, text, geometry, rotation, annotation, and form signals
