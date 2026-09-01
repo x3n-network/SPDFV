@@ -26,6 +26,8 @@ UI tests launch deterministic generated PDFs through the debug-only `SPDFV_UI_TE
 
 CLI integration tests generate deterministic PDFKit fixtures at runtime and exercise the compiled `spdfv` executable. Keep fixtures small and focused on one compatibility behavior. When a bug requires an external PDF, use a redistributable, non-sensitive sample, record its source and license, and add a save/reopen assertion that captures the regression.
 
+`CompatibilityCorpus` provides stable checked-in bytes for recurring interoperability cases. Every entry must be non-sensitive, listed in `manifest.json`, include provenance and license information, and be exercised by the manifest-backed CLI test. Use the generator for project-owned fixtures; PDFKit may refresh internal identifiers and encryption salts, so review semantic expectations rather than expecting regenerated hashes to match.
+
 ## Contribution license
 
 By submitting a contribution, you agree that it may be distributed under the project’s [MIT License](LICENSE).

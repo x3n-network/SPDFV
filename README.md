@@ -114,6 +114,7 @@ The full command reference and examples live in [CLI/README.md](CLI/README.md).
 SPDFV/       macOS app
 SPDFVTests/  native app state-transition tests
 SPDFVUITests/ critical document-flow UI automation
+CompatibilityCorpus/ redistributable PDF compatibility fixtures and manifest
 Core/        shared PDFKit operations and tests
 CLI/         spdfv command-line executable
 QueueRunner/ opt-in background queue helper

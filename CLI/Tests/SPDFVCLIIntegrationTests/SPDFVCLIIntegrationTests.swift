@@ -241,6 +241,47 @@ final class SPDFVCLIIntegrationTests: XCTestCase {
         }
     }
 
+    func testCheckedInCompatibilityCorpusMatchesManifest() throws {
+        let corpus = packageRootURL().deletingLastPathComponent()
+            .appendingPathComponent("CompatibilityCorpus", isDirectory: true)
+        let manifest = try JSONDecoder().decode(
+            CompatibilityManifest.self,
+            from: Data(contentsOf: corpus.appendingPathComponent("manifest.json"))
+        )
+
+        XCTAssertEqual(manifest.version, 1)
+        XCTAssertEqual(manifest.license, "MIT")
+        XCTAssertFalse(manifest.fixtures.isEmpty)
+
+        for fixture in manifest.fixtures {
+            let input = corpus.appendingPathComponent(fixture.file)
+            XCTAssertTrue(FileManager.default.fileExists(atPath: input.path), fixture.file)
+            let document = try XCTUnwrap(PDFDocument(url: input), fixture.file)
+            XCTAssertEqual(document.isLocked, fixture.locked, fixture.file)
+            XCTAssertEqual(document.pageCount, fixture.pageCount, fixture.file)
+
+            if fixture.locked {
+                let result = try runCLI(["safety-gate", input.path])
+                XCTAssertEqual(result.status, 0, result.stderr)
+                let gate = try XCTUnwrap(try jsonObject(result.stdout)["gate"] as? [String: Any])
+                XCTAssertEqual(gate["level"] as? String, "stop")
+                XCTAssertEqual(gate["locked"] as? Bool, true)
+            } else {
+                let result = try runCLI(["inspect", input.path])
+                XCTAssertEqual(result.status, 0, result.stderr)
+                XCTAssertEqual(try jsonObject(result.stdout)["pages"] as? Int, fixture.pageCount)
+            }
+
+            if !fixture.expectedFields.isEmpty {
+                let result = try runCLI(["forms", input.path])
+                XCTAssertEqual(result.status, 0, result.stderr)
+                let report = try XCTUnwrap(try jsonObject(result.stdout)["report"] as? [String: Any])
+                let fields = try XCTUnwrap(report["fields"] as? [[String: Any]])
+                XCTAssertEqual(fields.compactMap { $0["name"] as? String }.sorted(), fixture.expectedFields)
+            }
+        }
+    }
+
     private func makeCompatibilityFixture() throws -> Data {
         let document = PDFDocument()
         document.documentAttributes = [
@@ -312,10 +353,7 @@ final class SPDFVCLIIntegrationTests: XCTestCase {
             if FileManager.default.isExecutableFile(atPath: url.path) { return url }
         }
 
-        let packageRoot = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
+        let packageRoot = packageRootURL()
         let candidates = [
             packageRoot.appendingPathComponent(".build/debug/spdfv"),
             packageRoot.appendingPathComponent(".build/arm64-apple-macosx/debug/spdfv"),
@@ -326,6 +364,27 @@ final class SPDFVCLIIntegrationTests: XCTestCase {
             "The spdfv debug executable was not built before the integration tests."
         )
     }
+
+    private func packageRootURL() -> URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+    }
+}
+
+private struct CompatibilityManifest: Decodable {
+    let version: Int
+    let license: String
+    let fixtures: [CompatibilityFixture]
+}
+
+private struct CompatibilityFixture: Decodable {
+    let file: String
+    let purpose: String
+    let pageCount: Int
+    let locked: Bool
+    let expectedFields: [String]
 }
 
 private struct CommandResult {

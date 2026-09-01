@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "license": "MIT",
+  "generator": "Scripts/generate_compatibility_corpus.swift",
+  "fixtures": [
+    {
+      "file": "mixed-layout.pdf",
+      "purpose": "Mixed page boxes, rotations, metadata, and annotations",
+      "pageCount": 2,
+      "locked": false,
+      "expectedFields": []
+    },
+    {
+      "file": "interactive-form.pdf",
+      "purpose": "Interactive text and checkbox widgets",
+      "pageCount": 1,
+      "locked": false,
+      "expectedFields": ["approved", "review.owner"]
+    },
+    {
+      "file": "locked.pdf",
+      "purpose": "Encrypted-document safety preflight",
+      "pageCount": 2,
+      "locked": true,
+      "expectedFields": []
+    }
+  ]
+}
