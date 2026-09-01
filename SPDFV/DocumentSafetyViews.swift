@@ -104,6 +104,10 @@ struct DocumentInfoNavigator: View {
                             ForEach(report.pages.filter { $0.status != .unchanged }) { page in
                                 ComparisonPageRow(page: page) { session.showComparisonPage(page) }
                             }
+                            InspectorAction(title: "OPEN COMPARE WORKSPACE") {
+                                ComparisonWorkspaceWindowManager.shared.open(for: session)
+                            }
+                            InspectorAction(title: "EXPORT JSON REPORT", action: session.exportComparisonReport)
                             InspectorAction(title: "COMPARE AGAIN", action: session.compareWithPicker)
                             InspectorAction(title: "CLEAR COMPARISON", action: session.clearComparison)
                         } else {

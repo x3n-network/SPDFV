@@ -627,6 +627,46 @@ final class SPDFVCoreTests: XCTestCase {
         XCTAssertNil(reverse.pages.last?.candidatePage)
     }
 
+    func testPDFCompareIntelligentlyAlignsInsertedPages() throws {
+        let reference = makeDocument(pageNumbers: [1, 2, 3])
+        let candidate = makeDocument(pageNumbers: [9, 1, 2, 3])
+
+        let report = try PDFOperations.compare(reference: reference, candidate: candidate)
+
+        XCTAssertEqual(report.options.alignment, .intelligent)
+        XCTAssertEqual(report.addedPages, 1)
+        XCTAssertEqual(report.changedPages, 0)
+        XCTAssertEqual(report.unchangedPages, 3)
+        XCTAssertEqual(report.pages.map(\.status), [.added, .unchanged, .unchanged, .unchanged])
+        XCTAssertEqual(report.pages.map(\.referencePage), [nil, 1, 2, 3])
+        XCTAssertEqual(report.pages.map(\.candidatePage), [1, 2, 3, 4])
+
+        let positional = try PDFOperations.compare(
+            reference: reference,
+            candidate: candidate,
+            options: PDFComparisonOptions(alignment: .position)
+        )
+        XCTAssertEqual(positional.changedPages, 3)
+        XCTAssertEqual(positional.addedPages, 1)
+    }
+
+    func testPDFCompareSupportsAppearanceToleranceAndIgnoredRegions() throws {
+        let reference = makeDocument(pageNumbers: [1])
+        let candidate = makeDocument(pageNumbers: [2])
+        let options = PDFComparisonOptions(
+            alignment: .position,
+            minimumAppearanceSimilarity: 0,
+            ignoredRegions: [PDFComparisonIgnoredRegion(x: 0, y: 0, width: 0.25, height: 0.2)]
+        )
+
+        let report = try PDFOperations.compare(reference: reference, candidate: candidate, options: options)
+
+        XCTAssertEqual(report.options, options)
+        XCTAssertEqual(report.pages.first?.status, .changed)
+        XCTAssertTrue(report.pages.first?.differences.contains(.annotations) == true)
+        XCTAssertFalse(report.pages.first?.differences.contains(.appearance) == true)
+    }
+
     func testRecipeAssertionsObserveCurrentDocumentState() throws {
         let document = PDFDocument()
         let page = PDFPage()

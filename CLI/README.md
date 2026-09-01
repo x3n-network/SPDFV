@@ -13,7 +13,7 @@ CLI/.build/release/spdfv validate-form-data intake.pdf --data completed-values.j
 CLI/.build/release/spdfv import-form-data intake.pdf --data completed-values.json --output completed.pdf --pretty
 CLI/.build/release/spdfv safety-gate intake.pdf --pretty
 CLI/.build/release/spdfv safe-share review-copy.pdf --pretty
-CLI/.build/release/spdfv compare approved.pdf working-copy.pdf --pretty
+CLI/.build/release/spdfv compare approved.pdf working-copy.pdf --alignment intelligent --appearance-threshold 0.995 --ignore-regions '0,0,1,0.05' --pretty
 CLI/.build/release/spdfv doctor document.pdf --pretty
 CLI/.build/release/spdfv fill-form intake.pdf --values '{"full_name":"Ada Lovelace","approved":"true"}' --output completed.pdf
 CLI/.build/release/spdfv add-field intake.pdf --page 1 --type text --name reviewer --bounds 72,540,220,32 --output authored.pdf
@@ -43,7 +43,7 @@ Page specifications are one-based, accept comma-separated inclusive ranges, and 
 
 `safe-share` audits common information that can unintentionally travel with a PDF: populated metadata fields, review annotations, filled form fields, file attachments, encryption, and certificate-signature fields. Its JSON report deliberately includes metadata keys and form-field names rather than their private values, and summarizes annotation contents without copying them to stdout. A locked document returns `stop` without inspecting its contents.
 
-`compare` produces a privacy-conscious, page-by-page report for a reference and candidate PDF. It classifies unchanged, changed, added, and removed pages and explains changes through rendered appearance, normalized text, dimensions, rotation, annotation count, and form-field count without copying page text or field values into the report.
+`compare` produces a privacy-conscious, page-by-page report for a reference and candidate PDF. Intelligent alignment (the default) anchors matching pages so insertions and removals do not cascade into false changes; `--alignment position` restores strict positional comparison. `--appearance-threshold` accepts 0–1, and `--ignore-regions` accepts semicolon-separated normalized top-left-origin `x,y,width,height` rectangles. The report explains changes through rendered appearance, normalized text, dimensions, rotation, annotation count, and form-field count without copying page text or field values.
 
 `doctor` composes the Safety Gate, Form Gate, Safe Share audit, page geometry, rotation, and searchable-text coverage into one prioritized diagnostic. Its recommended actions route to existing remedies and its JSON report contains page and field identifiers, never document text, metadata values, annotation contents, or form values.
 

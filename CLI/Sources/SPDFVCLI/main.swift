@@ -84,12 +84,31 @@ private func safeShare(_ arguments: [String]) throws {
 
 private func compare(_ arguments: [String]) throws {
     let parser = try OptionParser(arguments)
-    try parser.rejectUnknownOptions(allowing: [])
+    try parser.rejectUnknownOptions(allowing: ["--alignment", "--appearance-threshold", "--ignore-regions"])
     guard parser.positional.count == 2 else {
         throw CLIError.usage("compare requires a reference PDF and a candidate PDF")
     }
     let referenceURL = fileURL(parser.positional[0])
     let candidateURL = fileURL(parser.positional[1])
+    let alignmentValue = parser.options["--alignment"] ?? PDFComparisonAlignment.intelligent.rawValue
+    guard let alignment = PDFComparisonAlignment(rawValue: alignmentValue) else {
+        throw CLIError.usage("--alignment must be intelligent or position")
+    }
+    let appearanceThreshold: Double
+    if let value = parser.options["--appearance-threshold"] {
+        guard let parsed = Double(value), (0...1).contains(parsed) else {
+            throw CLIError.usage("--appearance-threshold must be between 0 and 1")
+        }
+        appearanceThreshold = parsed
+    } else {
+        appearanceThreshold = 0.999
+    }
+    let ignoredRegions = try parser.options["--ignore-regions"].map(parseComparisonIgnoredRegions) ?? []
+    let options = PDFComparisonOptions(
+        alignment: alignment,
+        minimumAppearanceSimilarity: appearanceThreshold,
+        ignoredRegions: ignoredRegions
+    )
     let reference = try PDFOperations.open(referenceURL)
     let candidate = try PDFOperations.open(candidateURL)
     print(try encode(
@@ -97,7 +116,7 @@ private func compare(_ arguments: [String]) throws {
             operation: "compare",
             reference: referenceURL.path,
             candidate: candidateURL.path,
-            report: try PDFOperations.compare(reference: reference, candidate: candidate)
+            report: try PDFOperations.compare(reference: reference, candidate: candidate, options: options)
         ),
         pretty: parser.flags.contains("--pretty")
     ))
@@ -313,7 +332,7 @@ USAGE
   spdfv import-form-data <input.pdf> --data <data.json> --output <output.pdf> [--force] [--pretty]
   spdfv safety-gate <input.pdf> [--pretty]
   spdfv safe-share <input.pdf> [--pretty]
-  spdfv compare <reference.pdf> <candidate.pdf> [--pretty]
+  spdfv compare <reference.pdf> <candidate.pdf> [--alignment <intelligent|position>] [--appearance-threshold <0...1>] [--ignore-regions <x,y,w,h;...>] [--pretty]
   spdfv doctor <input.pdf> [--pretty]
   spdfv fill-form <input.pdf> --values <json-object> --output <output.pdf> [--force] [--pretty]
   spdfv add-field <input.pdf> --page <n> --type <text|checkbox|choice> --name <field> --bounds <x,y,w,h> [--value <text>] [--choices <a,b,c>] --output <output.pdf> [--force] [--pretty]

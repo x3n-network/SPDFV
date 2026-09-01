@@ -17,7 +17,7 @@ The interface is deliberately compact. It is not a web view in a desktop shell, 
 - Exchange form values through a versioned JSON Data Studio with preflight validation and atomic undo
 - Preflight document protections and unlock password-protected PDFs without retaining the password
 - Audit metadata, review annotations, filled forms, attachments, and signatures before sharing without copying private values into the report
-- Compare a working PDF with a reference using page-by-page appearance, text, geometry, rotation, annotation, and form signals
+- Compare a working PDF with a reference using intelligent page alignment, configurable appearance tolerance and ignored regions, side-by-side/overlay/heatmap views, and exportable privacy-conscious reports
 - Run Document Doctor for one prioritized access, page, text, form, and sharing-health report
 - Add an on-device searchable text layer to scanned pages with Vision OCR
 - Create permanent rasterized redactions and verify forbidden text is absent

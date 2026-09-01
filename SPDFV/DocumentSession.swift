@@ -26,6 +26,8 @@ final class DocumentSession: ObservableObject {
     @Published private(set) var doctorReport: PDFDoctorReport?
     @Published var comparisonReport: PDFComparisonReport?
     @Published var comparisonReferenceName: String?
+    @Published var comparisonOptions = PDFComparisonOptions()
+    @Published var selectedComparisonPosition: Int?
     @Published var isComparing = false
     @Published private(set) var recentDocuments: [URL] = []
     @Published private(set) var hasTextSelection = false
@@ -82,6 +84,7 @@ final class DocumentSession: ObservableObject {
     var pendingStyleEdit: (entry: AnnotationEntry, snapshot: AnnotationSnapshot)?
     var pageSelectionAnchor: Int?
     var comparisonRequestID: UUID?
+    var comparisonReferenceDocument: PDFDocument?
     private let pagePositionKey = "spdfv.document-page-position.v1"
     let historyDepthLimit = 100
 
@@ -167,6 +170,8 @@ final class DocumentSession: ObservableObject {
         doctorReport = nil
         comparisonReport = nil
         comparisonReferenceName = nil
+        comparisonReferenceDocument = nil
+        selectedComparisonPosition = nil
         isComparing = false
         comparisonRequestID = nil
         if safetyGate?.locked == true {

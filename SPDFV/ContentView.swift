@@ -92,6 +92,7 @@ struct ContentView: View {
         }
         .onDisappear {
             RecipeWorkspaceWindowManager.shared.close(for: session)
+            ComparisonWorkspaceWindowManager.shared.close(for: session)
             CloseProtectionCenter.shared.unregister(session)
             DocumentWindowManager.shared.unregister(session)
         }

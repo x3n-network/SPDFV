@@ -96,3 +96,23 @@ func parseRect(_ value: String) throws -> CGRect {
     }
     return CGRect(x: parts[0], y: parts[1], width: parts[2], height: parts[3])
 }
+
+func parseComparisonIgnoredRegions(_ value: String) throws -> [PDFComparisonIgnoredRegion] {
+    let regions = try value.split(separator: ";").map { component in
+        let values = component.split(separator: ",").compactMap {
+            Double($0.trimmingCharacters(in: .whitespaces))
+        }
+        guard values.count == 4,
+              values[0] >= 0, values[1] >= 0,
+              values[2] > 0, values[3] > 0,
+              values[0] + values[2] <= 1,
+              values[1] + values[3] <= 1 else {
+            throw CLIError.usage(
+                "--ignore-regions expects semicolon-separated normalized x,y,width,height values within 0...1"
+            )
+        }
+        return PDFComparisonIgnoredRegion(x: values[0], y: values[1], width: values[2], height: values[3])
+    }
+    guard !regions.isEmpty else { throw CLIError.usage("--ignore-regions cannot be empty") }
+    return regions
+}

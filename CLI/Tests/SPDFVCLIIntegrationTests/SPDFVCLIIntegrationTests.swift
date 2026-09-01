@@ -324,7 +324,13 @@ final class SPDFVCLIIntegrationTests: XCTestCase {
             candidate.insert(added, at: candidate.pageCount)
             try XCTUnwrap(candidate.dataRepresentation()).write(to: candidateURL)
 
-            let result = try runCLI(["compare", referenceURL.path, candidateURL.path, "--pretty"])
+            let result = try runCLI([
+                "compare", referenceURL.path, candidateURL.path,
+                "--alignment", "intelligent",
+                "--appearance-threshold", "0.995",
+                "--ignore-regions", "0,0,0.1,0.1;0.9,0.9,0.1,0.1",
+                "--pretty"
+            ])
 
             XCTAssertEqual(result.status, 0, result.stderr)
             let wrapper = try jsonObject(result.stdout)
@@ -334,6 +340,10 @@ final class SPDFVCLIIntegrationTests: XCTestCase {
             XCTAssertEqual(report["referencePageCount"] as? Int, 2)
             XCTAssertEqual(report["candidatePageCount"] as? Int, 3)
             XCTAssertEqual(report["addedPages"] as? Int, 1)
+            let options = try XCTUnwrap(report["options"] as? [String: Any])
+            XCTAssertEqual(options["alignment"] as? String, "intelligent")
+            XCTAssertEqual(options["minimumAppearanceSimilarity"] as? Double, 0.995)
+            XCTAssertEqual((options["ignoredRegions"] as? [[String: Any]])?.count, 2)
             let pages = try XCTUnwrap(report["pages"] as? [[String: Any]])
             XCTAssertEqual(pages.map { $0["status"] as? String }, ["changed", "unchanged", "added"])
             XCTAssertTrue((pages[0]["differences"] as? [String])?.contains("rotation") == true)
