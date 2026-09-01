@@ -55,7 +55,9 @@ do {
     guard let data = extracted.dataRepresentation() else {
         throw VerificationFailure.expectation("Could not serialize extracted PDF")
     }
-    let outputURL = URL(fileURLWithPath: "/tmp/SPDFV-roundtrip-verifier.pdf")
+    let outputURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent("SPDFV-roundtrip-\(UUID().uuidString).pdf")
+    defer { try? FileManager.default.removeItem(at: outputURL) }
     try data.write(to: outputURL, options: .atomic)
 
     guard let reopened = PDFDocument(url: outputURL) else {

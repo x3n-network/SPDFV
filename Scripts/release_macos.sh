@@ -92,25 +92,7 @@ xcode_developer_dir="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer
 
 run_validation() {
     echo "Running release validation gates…"
-    bash "$project_root/Scripts/audit_visual_assets.sh"
-    DEVELOPER_DIR="$xcode_developer_dir" swift test --package-path "$project_root/Core"
-    DEVELOPER_DIR="$xcode_developer_dir" swift test --package-path "$project_root/CLI"
-    DEVELOPER_DIR="$xcode_developer_dir" xcodebuild \
-        -project "$project_root/SPDFV.xcodeproj" \
-        -scheme SPDFV \
-        -configuration Debug \
-        -destination 'platform=macOS' \
-        -parallel-testing-enabled NO \
-        -only-testing:SPDFVTests \
-        CODE_SIGNING_ALLOWED=NO \
-        test
-    DEVELOPER_DIR="$xcode_developer_dir" xcodebuild \
-        -project "$project_root/SPDFV.xcodeproj" \
-        -scheme SPDFV \
-        -configuration Debug \
-        -destination 'platform=macOS' \
-        CODE_SIGNING_ALLOWED=NO \
-        build-for-testing
+    DEVELOPER_DIR="$xcode_developer_dir" bash "$project_root/Scripts/validate_project.sh" --release
 }
 
 verify_app_bundle() {

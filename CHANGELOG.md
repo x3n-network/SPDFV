@@ -19,6 +19,7 @@
 - Added an MIT-licensed, manifest-backed compatibility corpus for mixed page geometry, interactive forms, and encrypted-document preflight
 - Added clock-metric performance coverage for 250-page inspection and a 60-page multi-step recipe pipeline
 - Hardened macOS releases with monotonic version/build preflight, clean-tree enforcement, credential-free rehearsal, bundle-content verification, and atomic appcast validation
+- Unified CI, contributor, and release validation with release-optimized Core/CLI tests, PDFKit round-trip smoke coverage, native app tests, UI automation build/run modes, visual audits, and whitespace checks
 
 ## 0.1.2 - 2026-08-31
 

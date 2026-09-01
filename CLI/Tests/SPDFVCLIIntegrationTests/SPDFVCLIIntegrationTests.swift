@@ -669,11 +669,14 @@ final class SPDFVCLIIntegrationTests: XCTestCase {
         let candidates = [
             packageRoot.appendingPathComponent(".build/debug/spdfv"),
             packageRoot.appendingPathComponent(".build/arm64-apple-macosx/debug/spdfv"),
-            packageRoot.appendingPathComponent(".build/x86_64-apple-macosx/debug/spdfv")
+            packageRoot.appendingPathComponent(".build/x86_64-apple-macosx/debug/spdfv"),
+            packageRoot.appendingPathComponent(".build/release/spdfv"),
+            packageRoot.appendingPathComponent(".build/arm64-apple-macosx/release/spdfv"),
+            packageRoot.appendingPathComponent(".build/x86_64-apple-macosx/release/spdfv")
         ]
         return try XCTUnwrap(
             candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0.path) }),
-            "The spdfv debug executable was not built before the integration tests."
+            "The spdfv executable was not built before the integration tests."
         )
     }
 

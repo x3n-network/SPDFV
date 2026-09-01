@@ -13,38 +13,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Audit visual assets
-        run: bash Scripts/audit_visual_assets.sh
-
-      - name: Test shared core
-        run: swift test --package-path Core
-
-      - name: Build CLI
-        run: swift build --package-path CLI -c release
-
-      - name: Test CLI integration
-        run: swift test --package-path CLI
-
-      - name: Test app without signing
-        run: >-
-          xcodebuild
-          -project SPDFV.xcodeproj
-          -scheme SPDFV
-          -configuration Debug
-          -destination 'platform=macOS'
-          -only-testing:SPDFVTests
-          CODE_SIGNING_ALLOWED=NO
-          test
-
-      - name: Build UI automation without signing
-        run: >-
-          xcodebuild
-          -project SPDFV.xcodeproj
-          -scheme SPDFV
-          -configuration Debug
-          -destination 'platform=macOS'
-          CODE_SIGNING_ALLOWED=NO
-          build-for-testing
+      - name: Run release-grade validation
+        run: bash Scripts/validate_project.sh --release
 
       - name: Rehearse unsigned release
         env:
