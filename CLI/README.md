@@ -15,6 +15,7 @@ CLI/.build/release/spdfv safety-gate intake.pdf --pretty
 CLI/.build/release/spdfv safe-share review-copy.pdf --pretty
 CLI/.build/release/spdfv compare approved.pdf working-copy.pdf --alignment intelligent --appearance-threshold 0.995 --ignore-regions '0,0,1,0.05' --pretty
 CLI/.build/release/spdfv doctor document.pdf --pretty
+CLI/.build/release/spdfv doctor-repair document.pdf --actions metadata,forms --output repaired.pdf --pretty
 CLI/.build/release/spdfv fill-form intake.pdf --values '{"full_name":"Ada Lovelace","approved":"true"}' --output completed.pdf
 CLI/.build/release/spdfv add-field intake.pdf --page 1 --type text --name reviewer --bounds 72,540,220,32 --output authored.pdf
 CLI/.build/release/spdfv rename-field authored.pdf --from reviewer --to review.owner --output renamed.pdf
@@ -45,7 +46,7 @@ Page specifications are one-based, accept comma-separated inclusive ranges, and 
 
 `compare` produces a privacy-conscious, page-by-page report for a reference and candidate PDF. Intelligent alignment (the default) anchors matching pages so insertions and removals do not cascade into false changes; `--alignment position` restores strict positional comparison. `--appearance-threshold` accepts 0–1, and `--ignore-regions` accepts semicolon-separated normalized top-left-origin `x,y,width,height` rectangles. The report explains changes through rendered appearance, normalized text, dimensions, rotation, annotation count, and form-field count without copying page text or field values.
 
-`doctor` composes the Safety Gate, Form Gate, Safe Share audit, page geometry, rotation, and searchable-text coverage into one prioritized diagnostic. Its recommended actions route to existing remedies and its JSON report contains page and field identifiers, never document text, metadata values, annotation contents, or form values.
+`doctor` composes the Safety Gate, Form Gate, Safe Share audit, page geometry, rotation, and searchable-text coverage into one prioritized diagnostic and repair plan. `doctor-repair` applies all planned repairs, or a requested subset of `ocr`, `forms`, and `metadata`, to a new output and emits the before/after verification. OCR is limited to pages without searchable text. Both reports contain page and field identifiers, never document text, metadata values, annotation contents, or form values.
 
 `forms` reports every page widget, its canonical field name, type, value, bounds, choices, read-only status, and whether it has a normal appearance stream. `fill-form` accepts a JSON object of string values, keeps the output interactive, repairs genuinely orphaned PDFKit widgets during the write, and reopens the result to verify the canonical `/AcroForm/Fields` tree, widget values, and `/AP` `/N` appearances. Boolean button values accept `true`, `yes`, `on`, `checked`, or `1`.
 

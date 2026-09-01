@@ -367,6 +367,35 @@ final class SPDFVCoreTests: XCTestCase {
         XCTAssertFalse(json.contains("PAGE-1"))
     }
 
+    func testDocumentDoctorPlansAndVerifiesMetadataRepairOnCopy() throws {
+        let document = makeDocument(pageNumbers: [1, 2])
+        document.documentAttributes = [
+            PDFDocumentAttribute.authorAttribute: "Private Author",
+            PDFDocumentAttribute.titleAttribute: "Private Title"
+        ]
+        let sourceData = try XCTUnwrap(document.dataRepresentation())
+        let reopened = try XCTUnwrap(PDFDocument(data: sourceData))
+
+        let plan = PDFOperations.doctorRepairPlan(for: reopened)
+
+        XCTAssertEqual(plan.items.map(\.action), [.ocrPages, .removeMetadata])
+        XCTAssertEqual(plan.items.first?.pages, [1, 2])
+        XCTAssertTrue(plan.reviewIssueIDs.contains("privacy-review-annotations"))
+        let encodedPlan = String(decoding: try JSONEncoder().encode(plan), as: UTF8.self)
+        XCTAssertFalse(encodedPlan.contains("Private Author"))
+        XCTAssertFalse(encodedPlan.contains("Private Title"))
+
+        let result = try PDFOperations.applyDoctorRepairs(data: sourceData, actions: [.removeMetadata])
+        let repaired = try XCTUnwrap(PDFDocument(data: result.data))
+
+        XCTAssertTrue(result.verification.pageCountPreserved)
+        XCTAssertEqual(result.verification.appliedActions, [.removeMetadata])
+        XCTAssertFalse(result.verification.remainingIssueIDs.contains("privacy-document-metadata"))
+        XCTAssertTrue(PDFOperations.safeShareAudit(for: repaired).metadataKeys.isEmpty)
+        XCTAssertEqual(repaired.pageCount, reopened.pageCount)
+        XCTAssertFalse(PDFOperations.safeShareAudit(for: reopened).metadataKeys.isEmpty)
+    }
+
     func testFormAuthoringCreatesCanonicalInteractiveFields() throws {
         let document = PDFDocument()
         let page = PDFPage()

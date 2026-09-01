@@ -1,5 +1,6 @@
 import Foundation
 import PDFKit
+import SPDFVCore
 import XCTest
 
 final class SPDFVCLIIntegrationTests: XCTestCase {
@@ -413,7 +414,33 @@ final class SPDFVCLIIntegrationTests: XCTestCase {
             let issues = try XCTUnwrap(report["issues"] as? [[String: Any]])
             XCTAssertTrue(issues.contains { $0["id"] as? String == "mixed-page-sizes" })
             XCTAssertTrue(issues.contains { $0["id"] as? String == "privacy-document-metadata" })
+            let plan = try XCTUnwrap(wrapper["plan"] as? [String: Any])
+            let items = try XCTUnwrap(plan["items"] as? [[String: Any]])
+            XCTAssertTrue(items.contains { $0["action"] as? String == "removeMetadata" })
             XCTAssertFalse(result.stdout.contains("SPDFV Compatibility Fixture"))
+        }
+    }
+
+    func testDoctorRepairWritesVerifiedMetadataCleanCopy() throws {
+        try withFixtureDirectory { directory in
+            let input = directory.appendingPathComponent("diagnostic.pdf")
+            let output = directory.appendingPathComponent("repaired.pdf")
+            try makeCompatibilityFixture().write(to: input)
+
+            let result = try runCLI([
+                "doctor-repair", input.path, "--actions", "metadata",
+                "--output", output.path, "--pretty"
+            ])
+
+            XCTAssertEqual(result.status, 0, result.stderr)
+            let wrapper = try jsonObject(result.stdout)
+            let verification = try XCTUnwrap(wrapper["verification"] as? [String: Any])
+            XCTAssertEqual(verification["pageCountPreserved"] as? Bool, true)
+            XCTAssertEqual(verification["appliedActions"] as? [String], ["removeMetadata"])
+            let repaired = try XCTUnwrap(PDFDocument(url: output))
+            XCTAssertTrue(PDFOperations.safeShareAudit(for: repaired).metadataKeys.isEmpty)
+            let original = try XCTUnwrap(PDFDocument(url: input))
+            XCTAssertFalse(PDFOperations.safeShareAudit(for: original).metadataKeys.isEmpty)
         }
     }
 

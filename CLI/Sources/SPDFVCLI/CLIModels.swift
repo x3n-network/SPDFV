@@ -148,6 +148,15 @@ struct CompareOperationReport: Encodable {
 struct DoctorInspectionReport: Encodable {
     let input: String
     let report: PDFDoctorReport
+    let plan: PDFDoctorRepairPlan
+}
+
+struct DoctorRepairOperationReport: Encodable {
+    let operation: String
+    let input: String
+    let output: String
+    let verification: PDFDoctorRepairVerification
+    let ocr: PDFOCRReport?
 }
 
 struct FormFillOperationReport: Encodable {

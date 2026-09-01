@@ -81,6 +81,32 @@ struct DocumentInfoNavigator: View {
                                     DoctorIssueRow(issue: issue) { session.performDoctorAction(issue) }
                                 }
                             }
+                            if let plan = session.doctorRepairPlan, !plan.items.isEmpty {
+                                InspectorMessage("REPAIR PLAN · \(plan.items.count) COPY-SAFE ACTION\(plan.items.count == 1 ? "" : "S")")
+                                ForEach(plan.items) { item in
+                                    DoctorRepairItemRow(item: item)
+                                }
+                                ForEach(plan.warnings, id: \.self) { warning in
+                                    InspectorMessage(warning)
+                                }
+                                if session.isRepairingDocument {
+                                    InspectorMessage(session.doctorRepairStatusMessage ?? "Applying repairs to a copy…")
+                                } else {
+                                    InspectorAction(title: "REPAIR A COPY…", action: session.createDoctorRepairCopy)
+                                        .accessibilityIdentifier("doctor.repair-copy")
+                                }
+                            }
+                            if let verification = session.doctorRepairVerification {
+                                InspectorRow(
+                                    label: "Verified",
+                                    value: "\(verification.before.issues.count) before · \(verification.after.issues.count) after"
+                                )
+                                InspectorRow(label: "Pages", value: verification.pageCountPreserved ? "Preserved" : "Changed")
+                                if let message = session.doctorRepairStatusMessage {
+                                    InspectorMessage(message)
+                                }
+                                InspectorAction(title: "SHOW REPAIRED COPY", action: session.revealDoctorRepairCopy)
+                            }
                             InspectorAction(title: "RUN AGAIN", action: session.runDocumentDoctor)
                         } else {
                             InspectorMessage(
@@ -239,6 +265,30 @@ private struct DoctorIssueRow: View {
             if let recommendation = issue.action {
                 Button(recommendation.displayLabel, action: action)
                     .buttonStyle(.plain)
+                    .font(.system(size: 8, weight: .black, design: .monospaced))
+                    .foregroundStyle(SPDFVTheme.paleCobalt)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .overlay(alignment: .bottom) { Rectangle().fill(SPDFVTheme.divider).frame(height: 1) }
+    }
+}
+
+private struct DoctorRepairItemRow: View {
+    let item: PDFDoctorRepairItem
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(item.title)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(SPDFVTheme.navigatorText)
+            Text(item.detail)
+                .font(.system(size: 9))
+                .foregroundStyle(SPDFVTheme.navigatorMuted)
+                .fixedSize(horizontal: false, vertical: true)
+            if !item.pages.isEmpty {
+                Text("PAGES \(item.pages.map(String.init).joined(separator: ", "))")
                     .font(.system(size: 8, weight: .black, design: .monospaced))
                     .foregroundStyle(SPDFVTheme.paleCobalt)
             }

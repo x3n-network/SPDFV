@@ -291,10 +291,12 @@ final class DocumentSessionTests: XCTestCase {
         XCTAssertEqual(report.pages, 1)
         session.runDocumentDoctor()
         XCTAssertNotNil(session.doctorReport)
+        XCTAssertNotNil(session.doctorRepairPlan)
 
         session.rotateCurrentPage(clockwise: true)
         XCTAssertNil(session.safeShareReport)
         XCTAssertNil(session.doctorReport)
+        XCTAssertNil(session.doctorRepairPlan)
     }
 
     private func makePDF(

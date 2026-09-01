@@ -9,6 +9,7 @@ enum SPDFVActivityKind: String, Codable, CaseIterable {
     case batch
     case watch
     case queue
+    case doctor
 
     var label: String {
         switch self {
@@ -18,6 +19,7 @@ enum SPDFVActivityKind: String, Codable, CaseIterable {
         case .batch: "Batch"
         case .watch: "Watch lane"
         case .queue: "Queue"
+        case .doctor: "Document Doctor"
         }
     }
 
@@ -29,6 +31,7 @@ enum SPDFVActivityKind: String, Codable, CaseIterable {
         case .batch: .automation
         case .watch: .route
         case .queue: .queue
+        case .doctor: .warning
         }
     }
 }

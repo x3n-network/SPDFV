@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Added a privacy-conscious Document Doctor that prioritizes access, page, searchable-text, form, and sharing issues with routed remedies in the app and CLI
+- Added a privacy-conscious Document Doctor that prioritizes access, page, searchable-text, form, and sharing issues; previews copy-safe repairs; OCRs only affected pages; normalizes forms; removes metadata; and verifies repaired copies in the app and CLI
 - Added Form Data Studio for versioned JSON value export, privacy-conscious import validation, atomic native apply/undo, and CLI automation
 - Expanded privacy-conscious PDF Compare with intelligent inserted/removed-page alignment, configurable appearance tolerance and ignored regions, side-by-side/overlay/heatmap views, and JSON report export across Core, CLI, and the native workspace
 - Added backward-compatible Recipe v2 plates for page duplication, page deletion, OCR, and Safe Share assertions, with automatic schema upgrade in Recipe Press

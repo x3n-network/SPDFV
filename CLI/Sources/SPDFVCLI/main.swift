@@ -122,20 +122,6 @@ private func compare(_ arguments: [String]) throws {
     ))
 }
 
-private func doctor(_ arguments: [String]) throws {
-    let parser = try OptionParser(arguments)
-    try parser.rejectUnknownOptions(allowing: [])
-    guard parser.positional.count == 1 else {
-        throw CLIError.usage("doctor requires exactly one input PDF")
-    }
-    let url = fileURL(parser.positional[0])
-    let document = try PDFOperations.open(url)
-    print(try encode(
-        DoctorInspectionReport(input: url.path, report: PDFOperations.diagnose(document)),
-        pretty: parser.flags.contains("--pretty")
-    ))
-}
-
 private func extract(_ arguments: [String]) throws {
     let parser = try OptionParser(arguments)
     try parser.rejectUnknownOptions(allowing: ["--pages", "--output"])
@@ -334,6 +320,7 @@ USAGE
   spdfv safe-share <input.pdf> [--pretty]
   spdfv compare <reference.pdf> <candidate.pdf> [--alignment <intelligent|position>] [--appearance-threshold <0...1>] [--ignore-regions <x,y,w,h;...>] [--pretty]
   spdfv doctor <input.pdf> [--pretty]
+  spdfv doctor-repair <input.pdf> --output <output.pdf> [--actions <ocr,forms,metadata>] [--quality <fast|accurate>] [--languages <codes>] [--dpi <72...400>] [--force] [--pretty]
   spdfv fill-form <input.pdf> --values <json-object> --output <output.pdf> [--force] [--pretty]
   spdfv add-field <input.pdf> --page <n> --type <text|checkbox|choice> --name <field> --bounds <x,y,w,h> [--value <text>] [--choices <a,b,c>] --output <output.pdf> [--force] [--pretty]
   spdfv rename-field <input.pdf> --from <field> --to <field> --output <output.pdf> [--force] [--pretty]
@@ -380,6 +367,7 @@ do {
     case "safe-share": try safeShare(Array(arguments.dropFirst()))
     case "compare": try compare(Array(arguments.dropFirst()))
     case "doctor": try doctor(Array(arguments.dropFirst()))
+    case "doctor-repair": try doctorRepair(Array(arguments.dropFirst()))
     case "fill-form": try fillForm(Array(arguments.dropFirst()))
     case "add-field": try addField(Array(arguments.dropFirst()))
     case "rename-field": try renameField(Array(arguments.dropFirst()))
