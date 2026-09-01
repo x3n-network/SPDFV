@@ -22,6 +22,8 @@ final class DocumentSession: ObservableObject {
     @Published var outlineEntries: [OutlineEntry] = []
     @Published private(set) var documentDetails: DocumentDetails?
     @Published private(set) var safetyGate: PDFSafetyGateReport?
+    @Published var signatureVerificationReport: PDFSignatureVerificationReport?
+    @Published var isVerifyingSignatures = false
     @Published private(set) var safeShareReport: PDFSafeShareReport?
     @Published var doctorReport: PDFDoctorReport?
     @Published var doctorRepairPlan: PDFDoctorRepairPlan?
@@ -171,6 +173,7 @@ final class DocumentSession: ObservableObject {
         document = pdf
         fileURL = url
         safetyGate = PDFOperations.safetyGate(for: pdf)
+        signatureVerificationReport = nil
         safeShareReport = nil
         doctorReport = nil
         doctorRepairPlan = nil
@@ -384,6 +387,7 @@ final class DocumentSession: ObservableObject {
 
             documentDetails = Self.makeDocumentDetails(document: savedDocument, url: targetURL)
             safetyGate = PDFOperations.safetyGate(for: savedDocument)
+            signatureVerificationReport = nil
 
             editUndoStack = []
             editRedoStack = []

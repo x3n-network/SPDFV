@@ -17,6 +17,7 @@ The interface is deliberately compact. It is not a web view in a desktop shell, 
 - Exchange form values through a versioned JSON Data Studio with preflight validation and atomic undo
 - Generate one completed PDF per CSV/TSV row with reusable alias mappings, filename templates, and all-rows preflight
 - Preflight document protections and unlock password-protected PDFs without retaining the password
+- Verify PDF ByteRanges and detached CMS signatures, inspect signer certificates and timestamps, evaluate macOS trust, and detect later document changes
 - Audit metadata, review annotations, filled forms, attachments, and signatures before sharing without copying private values into the report
 - Compare a working PDF with a reference using intelligent page alignment, configurable appearance tolerance and ignored regions, side-by-side/overlay/heatmap views, and exportable privacy-conscious reports
 - Run Document Doctor for a prioritized health report, preview copy-safe OCR/form/metadata repairs, and verify a repaired copy against the original diagnosis

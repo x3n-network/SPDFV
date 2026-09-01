@@ -319,6 +319,7 @@ USAGE
   spdfv form-data-mapping-template <input.pdf> --data <rows.csv|rows.tsv> --output <mapping.json> [--filename <template>] [--format <csv|tsv>] [--force] [--pretty]
   spdfv batch-form-data <input.pdf> --data <rows.csv|rows.tsv> [--mapping <mapping.json>] [--filename <template>] [--format <csv|tsv>] [--output-dir <directory>] [--dry-run] [--force] [--pretty]
   spdfv safety-gate <input.pdf> [--pretty]
+  spdfv verify-signatures <input.pdf> [--pretty]
   spdfv safe-share <input.pdf> [--pretty]
   spdfv compare <reference.pdf> <candidate.pdf> [--alignment <intelligent|position>] [--appearance-threshold <0...1>] [--ignore-regions <x,y,w,h;...>] [--pretty]
   spdfv doctor <input.pdf> [--pretty]
@@ -368,6 +369,7 @@ do {
     case "form-data-mapping-template": try formDataMappingTemplate(Array(arguments.dropFirst()))
     case "batch-form-data": try batchFormData(Array(arguments.dropFirst()))
     case "safety-gate": try safetyGate(Array(arguments.dropFirst()))
+    case "verify-signatures": try verifySignatures(Array(arguments.dropFirst()))
     case "safe-share": try safeShare(Array(arguments.dropFirst()))
     case "compare": try compare(Array(arguments.dropFirst()))
     case "doctor": try doctor(Array(arguments.dropFirst()))

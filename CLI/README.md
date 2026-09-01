@@ -15,6 +15,7 @@ CLI/.build/release/spdfv form-data-mapping-template intake.pdf --data recipients
 CLI/.build/release/spdfv batch-form-data intake.pdf --data recipients.csv --mapping mapping.json --dry-run --pretty
 CLI/.build/release/spdfv batch-form-data intake.pdf --data recipients.csv --mapping mapping.json --output-dir ./completed --pretty
 CLI/.build/release/spdfv safety-gate intake.pdf --pretty
+CLI/.build/release/spdfv verify-signatures signed-contract.pdf --pretty
 CLI/.build/release/spdfv safe-share review-copy.pdf --pretty
 CLI/.build/release/spdfv compare approved.pdf working-copy.pdf --alignment intelligent --appearance-threshold 0.995 --ignore-regions '0,0,1,0.05' --pretty
 CLI/.build/release/spdfv doctor document.pdf --pretty
@@ -43,7 +44,9 @@ Page specifications are one-based, accept comma-separated inclusive ranges, and 
 
 ## Interactive forms
 
-`safety-gate` reports encryption and lock state, all seven PDF access permissions, certificate-signature field names, and a pass, warning, or stop result. Signature fields are reported conservatively: SPDFV does not yet perform cryptographic signature validation. Run this preflight before an automated editing workflow when preserving document protections matters.
+`safety-gate` reports encryption and lock state, all seven PDF access permissions, certificate-signature field names, and a pass, warning, or stop result. Run this preflight before an automated editing workflow when preserving document protections matters.
+
+`verify-signatures` validates the raw PDF ByteRange against common detached CMS signature containers (`adbe.pkcs7.detached` and `ETSI.CAdES.detached`), reports cryptographic integrity separately from macOS certificate trust, includes signer summary and certificate SHA-256 fingerprint, distinguishes authenticated timestamps from signer-supplied times, and detects bytes added after the signed revision. Unsupported containers are reported without claiming validity. Any PDF edit may invalidate or remove existing signatures.
 
 `safe-share` audits common information that can unintentionally travel with a PDF: populated metadata fields, review annotations, filled form fields, file attachments, encryption, and certificate-signature fields. Its JSON report deliberately includes metadata keys and form-field names rather than their private values, and summarizes annotation contents without copying them to stdout. A locked document returns `stop` without inspecting its contents.
 

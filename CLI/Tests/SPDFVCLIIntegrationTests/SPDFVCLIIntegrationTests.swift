@@ -91,6 +91,21 @@ final class SPDFVCLIIntegrationTests: XCTestCase {
         }
     }
 
+    func testSignatureVerificationReportsUnsignedPDFWithoutClaimingValidity() throws {
+        try withFixtureDirectory { directory in
+            let input = directory.appendingPathComponent("unsigned.pdf")
+            try makeCompatibilityFixture().write(to: input)
+
+            let result = try runCLI(["verify-signatures", input.path, "--pretty"])
+
+            XCTAssertEqual(result.status, 0, result.stderr)
+            let report = try XCTUnwrap(try jsonObject(result.stdout)["report"] as? [String: Any])
+            XCTAssertEqual(report["status"] as? String, "none")
+            XCTAssertEqual(report["embeddedSignatureCount"] as? Int, 0)
+            XCTAssertEqual(report["signatureFieldCount"] as? Int, 0)
+        }
+    }
+
     func testSafetyGateStopsLockedDocumentWithoutReadingContent() throws {
         try withFixtureDirectory { directory in
             let input = directory.appendingPathComponent("locked.pdf")

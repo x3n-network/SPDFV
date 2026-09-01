@@ -145,7 +145,95 @@ final class SPDFVCoreTests: XCTestCase {
         XCTAssertEqual(gate.level, .warning)
         XCTAssertEqual(gate.certificateSignatureFields, ["approval.signature"])
         XCTAssertEqual(gate.issues.map(\.id), ["certificate-signatures"])
-        XCTAssertTrue(gate.issues[0].detail.contains("not validated"))
+        XCTAssertTrue(gate.issues[0].detail.contains("Signature Verification"))
+
+        let verification = PDFOperations.verifySignatures(in: try XCTUnwrap(document.dataRepresentation()))
+        XCTAssertEqual(verification.status, .unsigned)
+        XCTAssertEqual(verification.signatureFieldCount, 1)
+        XCTAssertEqual(verification.embeddedSignatureCount, 0)
+        XCTAssertEqual(verification.signatures.first?.fieldName, "approval.signature")
+        XCTAssertEqual(verification.signatures.first?.cryptographicStatus, .unsigned)
+    }
+
+    func testSignatureVerificationRejectsMalformedByteRangesAndReportsPlainPDFs() throws {
+        let plainData = try XCTUnwrap(makeDocument(pageNumbers: [1]).dataRepresentation())
+        XCTAssertEqual(PDFOperations.verifySignatures(in: plainData).status, .none)
+
+        var malformed = plainData
+        malformed.append(Data("\n99 0 obj\n<< /Type /Sig /SubFilter /adbe.pkcs7.detached /ByteRange [0 10 20 10] /Contents <00> >>\nendobj\n".utf8))
+        let report = PDFOperations.verifySignatures(in: malformed)
+        XCTAssertEqual(report.status, .invalid)
+        XCTAssertEqual(report.embeddedSignatureCount, 1)
+        XCTAssertEqual(report.signatures.first?.cryptographicStatus, .invalid)
+        XCTAssertEqual(report.signatures.first?.coverage, .invalid)
+    }
+
+    func testSignatureVerificationValidatesRealDetachedCMSSeparatelyFromTrust() throws {
+        let openssl = ["/opt/homebrew/bin/openssl", "/usr/bin/openssl"]
+            .first { FileManager.default.isExecutableFile(atPath: $0) }
+        guard let openssl else { throw XCTSkip("OpenSSL is unavailable for the detached CMS fixture") }
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SPDFVSignatureTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let placeholderBytes = 8_192
+        let rangePlaceholder = "0000000000 0000000000 0000000000 0000000000"
+        let prefix = "%PDF-1.7\n1 0 obj\n<< /Type /Sig /SubFilter /adbe.pkcs7.detached /ByteRange [\(rangePlaceholder)] /Contents <"
+        let suffix = "> >>\nendobj\n%%EOF\n"
+        var unsignedPDF = prefix + String(repeating: "0", count: placeholderBytes * 2) + suffix
+        let contentsStart = prefix.utf8.count - 1
+        let contentsEnd = contentsStart + placeholderBytes * 2 + 2
+        let byteRanges = [0, contentsStart, contentsEnd, unsignedPDF.utf8.count - contentsEnd]
+        let renderedRanges = byteRanges.map { String(format: "%010d", $0) }.joined(separator: " ")
+        unsignedPDF = unsignedPDF.replacingOccurrences(of: rangePlaceholder, with: renderedRanges)
+        let unsignedBytes = Data(unsignedPDF.utf8)
+        var detachedContent = Data(unsignedBytes.prefix(contentsStart))
+        detachedContent.append(unsignedBytes.suffix(from: contentsEnd))
+
+        let contentURL = directory.appendingPathComponent("content.bin")
+        let keyURL = directory.appendingPathComponent("key.pem")
+        let certificateURL = directory.appendingPathComponent("certificate.pem")
+        let signatureURL = directory.appendingPathComponent("signature.der")
+        try detachedContent.write(to: contentURL)
+        try runOpenSSL(openssl, [
+            "req", "-x509", "-newkey", "rsa:2048", "-nodes",
+            "-keyout", keyURL.path, "-out", certificateURL.path,
+            "-subj", "/CN=SPDFV Test Signer", "-days", "1"
+        ])
+        try runOpenSSL(openssl, [
+            "cms", "-sign", "-binary", "-in", contentURL.path,
+            "-signer", certificateURL.path, "-inkey", keyURL.path,
+            "-outform", "DER", "-out", signatureURL.path,
+            "-nosmimecap", "-md", "sha256"
+        ])
+        let cms = try Data(contentsOf: signatureURL)
+        XCTAssertLessThan(cms.count, placeholderBytes)
+        let hex = cms.map { String(format: "%02X", $0) }.joined()
+            + String(repeating: "0", count: (placeholderBytes - cms.count) * 2)
+        let finalPDF = Data((String(unsignedPDF.prefix(contentsStart + 1)) + hex + String(unsignedPDF.dropFirst(contentsEnd - 1))).utf8)
+
+        let report = PDFOperations.verifySignatures(in: finalPDF)
+        XCTAssertEqual(report.status, .validUntrusted)
+        XCTAssertEqual(report.embeddedSignatureCount, 1)
+        XCTAssertEqual(report.signatures.first?.cryptographicStatus, .valid)
+        XCTAssertEqual(report.signatures.first?.trustStatus, .untrusted)
+        XCTAssertEqual(report.signatures.first?.coverage, .entireFile)
+        XCTAssertEqual(report.signatures.first?.signerSummary, "SPDFV Test Signer")
+        XCTAssertNotNil(report.signatures.first?.certificateSHA256)
+
+        var laterRevision = finalPDF
+        laterRevision.append(Data("\n% later incremental revision".utf8))
+        let modifiedReport = PDFOperations.verifySignatures(in: laterRevision)
+        XCTAssertEqual(modifiedReport.status, .modifiedAfterSigning)
+        XCTAssertEqual(modifiedReport.signatures.first?.cryptographicStatus, .valid)
+        XCTAssertGreaterThan(modifiedReport.signatures.first?.unsignedTrailingByteCount ?? 0, 0)
+
+        var tampered = finalPDF
+        tampered[0] = 0x21
+        let tamperedReport = PDFOperations.verifySignatures(in: tampered)
+        XCTAssertEqual(tamperedReport.status, .invalid)
+        XCTAssertEqual(tamperedReport.signatures.first?.cryptographicStatus, .invalid)
     }
 
     func testPageSelectionParsesRangesAndDeduplicates() throws {
@@ -908,6 +996,21 @@ final class SPDFVCoreTests: XCTestCase {
             document.insert(page, at: document.pageCount)
         }
         return document
+    }
+
+    private func runOpenSSL(_ executable: String, _ arguments: [String]) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
+        let output = Pipe()
+        process.standardOutput = output
+        process.standardError = output
+        try process.run()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            let detail = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+            throw NSError(domain: "SPDFVSignatureTests", code: Int(process.terminationStatus), userInfo: [NSLocalizedDescriptionKey: detail])
+        }
     }
 
     private func identity(_ page: PDFPage?) -> String? {

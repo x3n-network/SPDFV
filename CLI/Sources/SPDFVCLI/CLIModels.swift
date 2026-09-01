@@ -150,6 +150,12 @@ struct SafetyGateInspectionReport: Encodable {
     let gate: PDFSafetyGateReport
 }
 
+struct SignatureVerificationOperationReport: Encodable {
+    let operation: String
+    let input: String
+    let report: PDFSignatureVerificationReport
+}
+
 struct SafeShareInspectionReport: Encodable {
     let input: String
     let report: PDFSafeShareReport

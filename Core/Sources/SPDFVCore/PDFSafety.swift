@@ -152,7 +152,7 @@ public extension PDFOperations {
                     id: "certificate-signatures",
                     level: .warning,
                     title: "Certificate signature fields",
-                    detail: "Editing may invalidate an existing digital signature. SPDFV has not validated the signature cryptographically."
+                    detail: "Editing may invalidate an existing digital signature. Run Signature Verification against the saved file before making changes."
                 ))
             }
         }

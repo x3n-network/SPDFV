@@ -277,7 +277,7 @@ final class DocumentSessionTests: XCTestCase {
         XCTAssertEqual(page.bounds(for: .cropBox), cropped)
     }
 
-    func testSafeShareAuditRunsOnDemandAndInvalidatesAfterEditing() throws {
+    func testSafeShareAuditRunsOnDemandAndInvalidatesAfterEditing() async throws {
         let fixture = try makePDF(pageCount: 1, formFieldName: "account.owner")
         defer { try? FileManager.default.removeItem(at: fixture) }
 
@@ -292,11 +292,15 @@ final class DocumentSessionTests: XCTestCase {
         session.runDocumentDoctor()
         XCTAssertNotNil(session.doctorReport)
         XCTAssertNotNil(session.doctorRepairPlan)
+        session.verifyDocumentSignatures()
+        while session.isVerifyingSignatures { await Task.yield() }
+        XCTAssertEqual(session.signatureVerificationReport?.status, PDFSignatureOverallStatus.none)
 
         session.rotateCurrentPage(clockwise: true)
         XCTAssertNil(session.safeShareReport)
         XCTAssertNil(session.doctorReport)
         XCTAssertNil(session.doctorRepairPlan)
+        XCTAssertEqual(session.signatureVerificationReport?.status, PDFSignatureOverallStatus.none)
     }
 
     private func makePDF(

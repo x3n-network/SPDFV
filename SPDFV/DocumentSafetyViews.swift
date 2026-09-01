@@ -176,6 +176,8 @@ struct DocumentInfoNavigator: View {
                         }
                     }
 
+                    SignatureVerificationSection(session: session)
+
                     if let gate = session.safetyGate {
                         InspectorSection(title: "SAFETY GATE") {
                             InspectorRow(label: "Result", value: gate.level.displayLabel)
@@ -394,7 +396,7 @@ private extension PDFSafeShareCategory {
     }
 }
 
-private struct InspectorSection<Content: View>: View {
+struct InspectorSection<Content: View>: View {
     let title: String
     @ViewBuilder let content: Content
 
@@ -411,7 +413,7 @@ private struct InspectorSection<Content: View>: View {
     }
 }
 
-private struct InspectorRow: View {
+struct InspectorRow: View {
     let label: String
     let value: String
 
@@ -434,7 +436,7 @@ private struct InspectorRow: View {
     }
 }
 
-private struct InspectorMessage: View {
+struct InspectorMessage: View {
     let message: String
 
     init(_ message: String) {
@@ -451,7 +453,7 @@ private struct InspectorMessage: View {
     }
 }
 
-private struct InspectorAction: View {
+struct InspectorAction: View {
     let title: String
     let action: () -> Void
 
