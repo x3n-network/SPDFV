@@ -50,6 +50,55 @@ final class SPDFVUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["document.pdf"].waitForExistence(timeout: 5))
     }
 
+    func testDocumentHealthToolsProduceReports() throws {
+        let fixture = try makePDF()
+        defer { try? FileManager.default.removeItem(at: fixture) }
+        let app = launchApplication(documentURL: fixture)
+
+        XCTAssertTrue(app.descendants(matching: .any)["document.pdf"].waitForExistence(timeout: 5))
+        app.buttons["navigator.info"].click()
+
+        let doctor = app.buttons["doctor.run"]
+        XCTAssertTrue(doctor.waitForExistence(timeout: 2))
+        doctor.click()
+        XCTAssertTrue(app.descendants(matching: .any)["doctor.report"].waitForExistence(timeout: 2))
+
+        let safeShare = app.buttons["safe-share.run"]
+        XCTAssertTrue(safeShare.waitForExistence(timeout: 2))
+        safeShare.click()
+        XCTAssertTrue(app.descendants(matching: .any)["safe-share.report"].waitForExistence(timeout: 2))
+
+        XCTAssertTrue(app.buttons["compare.choose-reference"].exists)
+    }
+
+    func testFormDataStudioIsAvailableForInteractiveForms() throws {
+        let fixture = try makePDF(withTextField: true)
+        defer { try? FileManager.default.removeItem(at: fixture) }
+        let app = launchApplication(documentURL: fixture)
+
+        XCTAssertTrue(app.descendants(matching: .any)["document.pdf"].waitForExistence(timeout: 5))
+        app.buttons["navigator.forms"].click()
+
+        XCTAssertTrue(app.buttons["form-data.import"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["form-data.export"].exists)
+        XCTAssertTrue(app.buttons["form-data.export"].isEnabled)
+    }
+
+    func testRecipePressLoadsStarterRecipe() throws {
+        let fixture = try makePDF()
+        defer { try? FileManager.default.removeItem(at: fixture) }
+        let app = launchApplication(documentURL: fixture)
+
+        XCTAssertTrue(app.descendants(matching: .any)["document.pdf"].waitForExistence(timeout: 5))
+        app.buttons["workspace.automate"].click()
+        app.buttons["automation.recipe"].click()
+
+        XCTAssertTrue(app.descendants(matching: .any)["recipe.panel"].waitForExistence(timeout: 3))
+        app.buttons["recipe.use-starter"].click()
+        XCTAssertTrue(app.descendants(matching: .any)["recipe.loaded"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["recipe.dry-run"].exists)
+    }
+
     private func launchApplication(documentURL: URL? = nil) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["-ApplePersistenceIgnoreState", "YES"]
@@ -60,7 +109,7 @@ final class SPDFVUITests: XCTestCase {
         return app
     }
 
-    private func makePDF(password: String? = nil) throws -> URL {
+    private func makePDF(password: String? = nil, withTextField: Bool = false) throws -> URL {
         let image = NSImage(size: NSSize(width: 360, height: 480))
         image.lockFocus()
         NSColor.white.setFill()
@@ -72,7 +121,19 @@ final class SPDFVUITests: XCTestCase {
         image.unlockFocus()
 
         let document = PDFDocument()
-        document.insert(try XCTUnwrap(PDFPage(image: image)), at: 0)
+        let page = try XCTUnwrap(PDFPage(image: image))
+        if withTextField {
+            let field = PDFAnnotation(
+                bounds: CGRect(x: 72, y: 120, width: 216, height: 28),
+                forType: .widget,
+                withProperties: nil
+            )
+            field.widgetFieldType = .text
+            field.fieldName = "contact.name"
+            field.widgetStringValue = "Ada Lovelace"
+            page.addAnnotation(field)
+        }
+        document.insert(page, at: 0)
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("spdfv-ui-tests-\(UUID().uuidString)")
             .appendingPathExtension("pdf")

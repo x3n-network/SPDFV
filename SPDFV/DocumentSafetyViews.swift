@@ -70,6 +70,7 @@ struct DocumentInfoNavigator: View {
                     InspectorSection(title: "DOCUMENT DOCTOR") {
                         if let report = session.doctorReport {
                             InspectorRow(label: "Result", value: report.level.displayLabel)
+                                .accessibilityIdentifier("doctor.report")
                             InspectorRow(label: "Text", value: "\(report.searchablePages)/\(report.pageCount) searchable pages")
                             InspectorRow(label: "Forms", value: "\(report.formWidgets) widgets")
                             InspectorRow(label: "Review", value: "\(report.reviewAnnotations) annotations")
@@ -117,6 +118,7 @@ struct DocumentInfoNavigator: View {
                     InspectorSection(title: "SAFE SHARE") {
                         if let report = session.safeShareReport {
                             InspectorRow(label: "Result", value: report.level.displayLabel)
+                                .accessibilityIdentifier("safe-share.report")
                             InspectorRow(
                                 label: "Text",
                                 value: "\(report.searchableTextPages)/\(report.pages) searchable pages"

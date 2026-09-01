@@ -142,6 +142,7 @@ struct RecipePanel: View {
                     .buttonStyle(RecipePanelButtonStyle(prominent: true))
                 Button("USE STARTER") { session.loadStarterRecipe() }
                     .buttonStyle(RecipePanelButtonStyle(prominent: false))
+                    .accessibilityIdentifier("recipe.use-starter")
                 Button("CABINET") { isShowingLibrary = true }
                     .buttonStyle(RecipePanelButtonStyle(prominent: false))
             }
@@ -197,6 +198,7 @@ struct RecipePanel: View {
                 proofDesk(recipe)
             }
         }
+        .accessibilityIdentifier("recipe.loaded")
         .onChange(of: recipe.steps.count) { _, count in
             selectedStep = min(selectedStep, max(0, count - 1))
         }
@@ -532,6 +534,7 @@ struct RecipePanel: View {
                 Button(session.isRunningRecipe ? "CHECKING…" : "DRY RUN") { session.validateLoadedRecipe() }
                     .buttonStyle(RecipePanelButtonStyle(prominent: false))
                     .disabled(session.isRunningRecipe)
+                    .accessibilityIdentifier("recipe.dry-run")
                 Button(session.isRunningRecipe ? "PROCESSING…" : "EXPORT PDF") { session.exportLoadedRecipe() }
                     .buttonStyle(RecipePanelButtonStyle(prominent: true))
                     .disabled(session.isRunningRecipe)
