@@ -66,6 +66,12 @@ Run the shared-core tests:
 swift test --package-path Core
 ```
 
+Run the focused performance measurements:
+
+```sh
+swift test --package-path Core --filter PDFPerformanceTests
+```
+
 Run the native app tests:
 
 ```sh

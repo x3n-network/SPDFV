@@ -28,6 +28,8 @@ CLI integration tests generate deterministic PDFKit fixtures at runtime and exer
 
 `CompatibilityCorpus` provides stable checked-in bytes for recurring interoperability cases. Every entry must be non-sensitive, listed in `manifest.json`, include provenance and license information, and be exercised by the manifest-backed CLI test. Use the generator for project-owned fixtures; PDFKit may refresh internal identifiers and encryption salts, so review semantic expectations rather than expecting regenerated hashes to match.
 
+Core performance tests record XCTest clock metrics for large-document inspection and multi-step recipes. Keep correctness assertions inside measured work, compare measurements on similar hardware, and establish Xcode baselines deliberately instead of adding tight wall-clock assertions that make CI hardware variance look like a regression.
+
 ## Contribution license
 
 By submitting a contribution, you agree that it may be distributed under the project’s [MIT License](LICENSE).

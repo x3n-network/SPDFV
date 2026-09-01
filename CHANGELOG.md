@@ -9,6 +9,7 @@
 - Added stable accessibility identifiers and UI automation for empty, document, automation, and encrypted-document flows
 - Expanded executable-level CLI tests across annotations, page assembly and crop, form authoring, recipes, and durable queues
 - Added an MIT-licensed, manifest-backed compatibility corpus for mixed page geometry, interactive forms, and encrypted-document preflight
+- Added clock-metric performance coverage for 250-page inspection and a 60-page multi-step recipe pipeline
 
 ## 0.1.2 - 2026-08-31
 
