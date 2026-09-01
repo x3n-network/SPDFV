@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.3 - 2026-09-01
+
 - Added cryptographic PDF signature verification for detached CMS signatures with ByteRange integrity, certificate details, macOS trust evaluation, authenticated timestamps, later-revision detection, and edit invalidation warnings
 - Added a privacy-conscious Document Doctor that prioritizes access, page, searchable-text, form, and sharing issues; previews copy-safe repairs; OCRs only affected pages; normalizes forms; removes metadata; and verifies repaired copies in the app and CLI
 - Added Form Data Studio for versioned JSON value export, privacy-conscious import validation, atomic native apply/undo, and CLI automation
