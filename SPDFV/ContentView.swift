@@ -36,6 +36,7 @@ struct ContentView: View {
             }
         }
         .frame(minWidth: 820, minHeight: 560)
+        .accessibilityIdentifier("document.window")
         .background(SPDFVTheme.canvas)
         .background(
             WindowCloseGuard(session: session, viewerActions: viewerActions)

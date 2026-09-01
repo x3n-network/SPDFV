@@ -29,6 +29,13 @@
 			remoteGlobalIDString = C9F489303043730A00732C4A;
 			remoteInfo = SPDFV;
 		};
+		A40000000000000000000007 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C9F489293043730A00732C4A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C9F489303043730A00732C4A;
+			remoteInfo = SPDFV;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -61,6 +68,7 @@
 		D10000000000000000000001 /* SPDFVQueueRunner */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = SPDFVQueueRunner; sourceTree = BUILT_PRODUCTS_DIR; };
 		D10000000000000000000004 /* SPDFV/com.x3nllc.SPDFV.QueueRunner.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = SPDFV/com.x3nllc.SPDFV.QueueRunner.plist; sourceTree = SOURCE_ROOT; };
 		F30000000000000000000001 /* SPDFVTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SPDFVTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A40000000000000000000001 /* SPDFVUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SPDFVUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -93,6 +101,11 @@
 			path = SPDFVTests;
 			sourceTree = "<group>";
 		};
+		A40000000000000000000002 /* SPDFVUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SPDFVUITests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -120,6 +133,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A40000000000000000000005 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -129,6 +149,7 @@
 				C9F489333043730A00732C4A /* SPDFV */,
 				D10000000000000000000006 /* QueueRunner */,
 				F30000000000000000000002 /* SPDFVTests */,
+				A40000000000000000000002 /* SPDFVUITests */,
 				C9F489323043730A00732C4A /* Products */,
 				C9F48A303046078E00732C4A /* Recovered References */,
 			);
@@ -140,6 +161,7 @@
 				C9F489313043730A00732C4A /* SPDFV.app */,
 				D10000000000000000000001 /* SPDFVQueueRunner */,
 				F30000000000000000000001 /* SPDFVTests.xctest */,
+				A40000000000000000000001 /* SPDFVUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -227,6 +249,29 @@
 			productReference = F30000000000000000000001 /* SPDFVTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		A40000000000000000000003 /* SPDFVUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A4000000000000000000000B /* Build configuration list for PBXNativeTarget "SPDFVUITests" */;
+			buildPhases = (
+				A40000000000000000000004 /* Sources */,
+				A40000000000000000000005 /* Frameworks */,
+				A40000000000000000000006 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A40000000000000000000008 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A40000000000000000000002 /* SPDFVUITests */,
+			);
+			name = SPDFVUITests;
+			packageProductDependencies = (
+			);
+			productName = SPDFVUITests;
+			productReference = A40000000000000000000001 /* SPDFVUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -244,6 +289,10 @@
 						CreatedOnToolsVersion = 26.6;
 					};
 					F30000000000000000000003 = {
+						CreatedOnToolsVersion = 26.6;
+						TestTargetID = C9F489303043730A00732C4A;
+					};
+					A40000000000000000000003 = {
 						CreatedOnToolsVersion = 26.6;
 						TestTargetID = C9F489303043730A00732C4A;
 					};
@@ -270,6 +319,7 @@
 				C9F489303043730A00732C4A /* SPDFV */,
 				D10000000000000000000010 /* SPDFVQueueRunner */,
 				F30000000000000000000003 /* SPDFVTests */,
+				A40000000000000000000003 /* SPDFVUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -283,6 +333,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		F30000000000000000000006 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A40000000000000000000006 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -313,6 +370,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A40000000000000000000004 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -325,6 +389,11 @@
 			isa = PBXTargetDependency;
 			target = C9F489303043730A00732C4A /* SPDFV */;
 			targetProxy = F30000000000000000000007 /* PBXContainerItemProxy */;
+		};
+		A40000000000000000000008 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C9F489303043730A00732C4A /* SPDFV */;
+			targetProxy = A40000000000000000000007 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -595,6 +664,42 @@
 			};
 			name = Release;
 		};
+		A40000000000000000000009 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HT5B666N35;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.x3nllc.SPDFVUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = SPDFV;
+			};
+			name = Debug;
+		};
+		A4000000000000000000000A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HT5B666N35;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.x3nllc.SPDFVUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = SPDFV;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -630,6 +735,15 @@
 			buildConfigurations = (
 				F30000000000000000000009 /* Debug */,
 				F3000000000000000000000A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A4000000000000000000000B /* Build configuration list for PBXNativeTarget "SPDFVUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A40000000000000000000009 /* Debug */,
+				A4000000000000000000000A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -74,9 +74,24 @@ xcodebuild \
   -scheme SPDFV \
   -configuration Debug \
   -destination 'platform=macOS' \
+  -only-testing:SPDFVTests \
   CODE_SIGNING_ALLOWED=NO \
   test
 ```
+
+Build the UI automation bundle without signing:
+
+```sh
+xcodebuild \
+  -project SPDFV.xcodeproj \
+  -scheme SPDFV \
+  -configuration Debug \
+  -destination 'platform=macOS' \
+  CODE_SIGNING_ALLOWED=NO \
+  build-for-testing
+```
+
+Run `-only-testing:SPDFVUITests test` from a signed local build when the test runner has macOS Accessibility permission.
 
 Build the CLI:
 
@@ -98,6 +113,7 @@ The full command reference and examples live in [CLI/README.md](CLI/README.md).
 ```text
 SPDFV/       macOS app
 SPDFVTests/  native app state-transition tests
+SPDFVUITests/ critical document-flow UI automation
 Core/        shared PDFKit operations and tests
 CLI/         spdfv command-line executable
 QueueRunner/ opt-in background queue helper

@@ -39,6 +39,7 @@ struct RecipePanel: View {
             alignment: .top
         )
         .background(SPDFVTheme.navigator)
+        .accessibilityIdentifier("recipe.panel")
         .animation(.snappy(duration: 0.22), value: isComposing)
         .alert("Remove recipe drawer?", isPresented: Binding(
             get: { pendingLibraryDelete != nil },
@@ -99,6 +100,7 @@ struct RecipePanel: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Close recipe panel")
+            .accessibilityIdentifier("recipe.close")
         }
         .foregroundStyle(SPDFVTheme.navigatorText)
         .padding(16)
@@ -822,4 +824,3 @@ struct RecipePanel: View {
         return session.recipeReport == nil ? SPDFVTheme.navigatorFaint : Color.green
     }
 }
-

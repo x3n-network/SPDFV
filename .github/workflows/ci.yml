@@ -32,8 +32,19 @@ jobs:
           -scheme SPDFV
           -configuration Debug
           -destination 'platform=macOS'
+          -only-testing:SPDFVTests
           CODE_SIGNING_ALLOWED=NO
           test
+
+      - name: Build UI automation without signing
+        run: >-
+          xcodebuild
+          -project SPDFV.xcodeproj
+          -scheme SPDFV
+          -configuration Debug
+          -destination 'platform=macOS'
+          CODE_SIGNING_ALLOWED=NO
+          build-for-testing
 
       - name: Build release app without signing
         run: >-

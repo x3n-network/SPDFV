@@ -13,6 +13,7 @@ struct PDFWorkspace: NSViewRepresentable {
     func makeNSView(context: Context) -> PDFView {
         let pdfView = context.coordinator.pdfView
         pdfView.setAccessibilityLabel("PDF document")
+        pdfView.setAccessibilityIdentifier("document.pdf")
         pdfView.backgroundColor = SPDFVTheme.canvasNSColor(for: colorScheme)
         context.coordinator.selectionColor = SPDFVTheme.selectionNSColor(for: colorScheme)
         context.coordinator.startObserving()

@@ -327,12 +327,14 @@ struct EmptyDocumentView: View {
                     .background(SPDFVTheme.statusBarBackground)
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("document.open")
             }
             .padding(42)
         }
         .frame(width: 510, height: 350, alignment: .leading)
         .background(SPDFVTheme.folio)
         .shadow(color: .black.opacity(0.28), radius: 32, y: 16)
+        .accessibilityIdentifier("document.empty")
     }
 }
 

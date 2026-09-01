@@ -26,6 +26,7 @@ struct LockedDocumentView: View {
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 280)
                 .onSubmit(unlock)
+                .accessibilityIdentifier("document.unlock.password")
 
             if unlockFailed {
                 Text("That password did not unlock the document.")
@@ -36,10 +37,12 @@ struct LockedDocumentView: View {
             HStack(spacing: 10) {
                 Button("OPEN ANOTHER PDF", action: openDocument)
                     .buttonStyle(.bordered)
+                    .accessibilityIdentifier("document.unlock.open-another")
                 Button("UNLOCK", action: unlock)
                     .buttonStyle(.borderedProminent)
                     .tint(SPDFVTheme.cobalt)
                     .disabled(password.isEmpty)
+                    .accessibilityIdentifier("document.unlock.submit")
             }
             .font(.system(size: 10, weight: .black, design: .monospaced))
         }
@@ -48,6 +51,7 @@ struct LockedDocumentView: View {
         .background(SPDFVTheme.canvas)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Locked PDF")
+        .accessibilityIdentifier("document.locked")
     }
 
     private func unlock() {

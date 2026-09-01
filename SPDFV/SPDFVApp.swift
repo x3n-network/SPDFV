@@ -12,9 +12,17 @@ struct SPDFVApp: App {
     @NSApplicationDelegateAdaptor(SPDFVApplicationDelegate.self) private var applicationDelegate
     private let updaterController = SPDFVUpdaterController()
 
+    private var testDocumentURL: URL? {
+#if DEBUG
+        ProcessInfo.processInfo.environment["SPDFV_UI_TEST_PDF"].map(URL.init(fileURLWithPath:))
+#else
+        nil
+#endif
+    }
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(initialURL: testDocumentURL)
         }
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified(showsTitle: true))

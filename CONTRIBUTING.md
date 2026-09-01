@@ -4,7 +4,7 @@ SPDFV is a macOS application with a shared core and CLI. Changes should preserve
 
 ## Before opening a change
 
-1. Run the `SPDFV` scheme's tests with signing disabled.
+1. Run the `SPDFVTests` target with signing disabled and build the UI automation bundle with `build-for-testing`.
 2. Run `swift test --package-path Core`.
 3. Run `swift test --package-path CLI`; if the shared core changed, also exercise the relevant command manually.
 4. Test both light and dark appearance for visible interface changes.
@@ -21,6 +21,8 @@ SPDFV is a macOS application with a shared core and CLI. Changes should preserve
 ## Compatibility tests
 
 App tests use small generated PDFs to verify `DocumentSession` state transitions without checking in document fixtures. Add a focused state assertion when changing page selection, edit history, or recipe composition behavior.
+
+UI tests launch deterministic generated PDFs through the debug-only `SPDFV_UI_TEST_PDF` environment variable. Keep stable `document.*`, `workspace.*`, `navigator.*`, `page.*`, and `automation.*` accessibility identifiers on critical controls. Running UI automation locally requires Accessibility permission for the Xcode test runner.
 
 CLI integration tests generate deterministic PDFKit fixtures at runtime and exercise the compiled `spdfv` executable. Keep fixtures small and focused on one compatibility behavior. When a bug requires an external PDF, use a redistributable, non-sensitive sample, record its source and license, and add a save/reopen assertion that captures the regression.
 

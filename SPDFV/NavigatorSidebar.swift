@@ -58,6 +58,7 @@ struct NavigatorSidebar: View {
                     }
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("navigator.\(mode.rawValue)")
             }
         }
     }

@@ -156,12 +156,14 @@ struct WorkspaceBench: View {
         if compact {
             SquareToolButton(icon: .quickAction, help: "Open Recipe Press") { openRecipeWorkspace() }
                 .disabled(session.isRunningRecipe)
+                .accessibilityIdentifier("automation.recipe")
             ocrButton(compact: true)
             redactionButton(compact: true)
             queueButton(compact: true)
         } else {
             BenchButton("Recipe Press", icon: .quickAction, active: session.loadedRecipe != nil) { openRecipeWorkspace() }
                 .disabled(session.isRunningRecipe)
+                .accessibilityIdentifier("automation.recipe")
             ocrButton(compact: false)
             redactionButton(compact: false)
             queueButton(compact: false)
@@ -183,6 +185,7 @@ struct WorkspaceBench: View {
             OCRPanel(session: session, isPresented: $showsOCRPanel)
         }
         .help("Create a searchable PDF copy with on-device OCR")
+        .accessibilityIdentifier("automation.ocr")
     }
 
     private func redactionButton(compact: Bool) -> some View {
@@ -207,6 +210,7 @@ struct WorkspaceBench: View {
         }
         .accessibilityLabel("Redaction Gate")
         .accessibilityValue("\(session.pendingRedactions.count) staged regions")
+        .accessibilityIdentifier("automation.redaction")
         .help("Stage regions and create a sanitized PDF copy")
     }
 
@@ -232,6 +236,7 @@ struct WorkspaceBench: View {
         .buttonStyle(.plain)
         .help("Open the activity center")
         .accessibilityLabel("Open activity center")
+        .accessibilityIdentifier("automation.activity")
     }
 
     private func toolLabel(compact: Bool, title: String, icon: SPDFVIconName, color: Color) -> some View {
@@ -276,6 +281,7 @@ struct WorkspaceBench: View {
         .fixedSize()
         .accessibilityLabel("Document save status")
         .accessibilityValue(session.isDirty ? "Unsaved changes" : "Saved")
+        .accessibilityIdentifier("document.save-status")
     }
 
     private var divider: some View {
@@ -369,6 +375,7 @@ private struct WorkspaceModePicker: View {
             .help("Workspace: \(selection.label)")
             .accessibilityLabel("Document workspace")
             .accessibilityValue(selection.label)
+            .accessibilityIdentifier("workspace.selector")
         } else {
             HStack(spacing: 0) {
                 ForEach(DocumentWorkspaceMode.allCases) { mode in
@@ -389,6 +396,7 @@ private struct WorkspaceModePicker: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel("\(mode.label) workspace")
                     .accessibilityValue(mode == selection ? "Selected" : "Not selected")
+                    .accessibilityIdentifier("workspace.\(mode.rawValue)")
                 }
             }
             .overlay { Rectangle().stroke(SPDFVTheme.divider, lineWidth: 1) }

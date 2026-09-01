@@ -23,6 +23,7 @@ struct PageJumpControl: View {
                     session.perform(.previousPage)
                 }
                 .disabled(session.pageIndex <= 0 || session.pageCount == 0)
+                .accessibilityIdentifier("page.previous")
             }
 
             pageBadgeButton
@@ -46,6 +47,7 @@ struct PageJumpControl: View {
                     session.perform(.nextPage)
                 }
                 .disabled(session.pageIndex >= max(0, session.pageCount - 1) || session.pageCount == 0)
+                .accessibilityIdentifier("page.next")
             }
         }
         .disabled(session.pageCount == 0)
@@ -92,6 +94,7 @@ struct PageJumpControl: View {
         .accessibilityValue("Page \(session.pageIndex + 1) of \(session.pageCount)")
         .accessibilityHint("Opens numeric jump entry popover to navigate directly to any page")
         .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("page.jump")
     }
 
     private func presentJumpPopover() {
