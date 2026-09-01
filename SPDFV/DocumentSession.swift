@@ -23,6 +23,9 @@ final class DocumentSession: ObservableObject {
     @Published private(set) var documentDetails: DocumentDetails?
     @Published private(set) var safetyGate: PDFSafetyGateReport?
     @Published private(set) var safeShareReport: PDFSafeShareReport?
+    @Published var comparisonReport: PDFComparisonReport?
+    @Published var comparisonReferenceName: String?
+    @Published var isComparing = false
     @Published private(set) var recentDocuments: [URL] = []
     @Published private(set) var hasTextSelection = false
     @Published private(set) var isDirty = false
@@ -74,6 +77,7 @@ final class DocumentSession: ObservableObject {
     var historyTruncated = false
     var pendingStyleEdit: (entry: AnnotationEntry, snapshot: AnnotationSnapshot)?
     var pageSelectionAnchor: Int?
+    var comparisonRequestID: UUID?
     private let pagePositionKey = "spdfv.document-page-position.v1"
     let historyDepthLimit = 100
 
@@ -156,6 +160,10 @@ final class DocumentSession: ObservableObject {
         fileURL = url
         safetyGate = PDFOperations.safetyGate(for: pdf)
         safeShareReport = nil
+        comparisonReport = nil
+        comparisonReferenceName = nil
+        isComparing = false
+        comparisonRequestID = nil
         if safetyGate?.locked == true {
             navigatorMode = .info
             thumbnailsVisible = true

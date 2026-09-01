@@ -512,6 +512,53 @@ final class SPDFVCoreTests: XCTestCase {
         XCTAssertEqual(document.pageCount, 3)
     }
 
+    func testPDFCompareReportsIdenticalRoundTripWithoutExposingContent() throws {
+        let reference = makeDocument(pageNumbers: [1, 2])
+        let candidate = try XCTUnwrap(PDFDocument(data: XCTUnwrap(reference.dataRepresentation())))
+
+        let report = try PDFOperations.compare(reference: reference, candidate: candidate)
+
+        XCTAssertEqual(report.status, .identical)
+        XCTAssertEqual(report.unchangedPages, 2)
+        XCTAssertEqual(report.changedPages, 0)
+        XCTAssertEqual(report.pages.map(\.status), [.unchanged, .unchanged])
+        XCTAssertTrue(report.pages.allSatisfy { ($0.appearanceSimilarity ?? 0) >= 0.999 })
+        let json = String(decoding: try JSONEncoder().encode(report), as: UTF8.self)
+        XCTAssertFalse(json.contains("PAGE-1"))
+        XCTAssertFalse(json.contains("PAGE-2"))
+    }
+
+    func testPDFCompareClassifiesChangedAddedAndRemovedPages() throws {
+        let reference = makeDocument(pageNumbers: [1, 2])
+        let candidate = makeDocument(pageNumbers: [1, 2, 3])
+        candidate.page(at: 0)?.rotation = 90
+        candidate.page(at: 0)?.annotations.first?.contents = "ALTERED REVIEW NOTE"
+        _ = try PDFOperations.addFormField(
+            PDFFormFieldDraft(name: "approval", kind: .checkbox),
+            to: candidate,
+            pageIndex: 1,
+            bounds: CGRect(x: 40, y: 640, width: 24, height: 24)
+        )
+
+        let report = try PDFOperations.compare(reference: reference, candidate: candidate)
+
+        XCTAssertEqual(report.status, .changed)
+        XCTAssertEqual(report.changedPages, 2)
+        XCTAssertEqual(report.addedPages, 1)
+        XCTAssertEqual(report.removedPages, 0)
+        XCTAssertEqual(report.pages.map(\.status), [.changed, .changed, .added])
+        XCTAssertTrue(report.pages[0].differences.contains(.rotation))
+        XCTAssertTrue(report.pages[0].differences.contains(.appearance))
+        XCTAssertTrue(report.pages[0].differences.contains(.annotations))
+        XCTAssertTrue(report.pages[1].differences.contains(.formFields))
+        XCTAssertEqual(report.pages[2].candidatePage, 3)
+
+        let reverse = try PDFOperations.compare(reference: candidate, candidate: reference)
+        XCTAssertEqual(reverse.removedPages, 1)
+        XCTAssertEqual(reverse.pages.last?.status, .removed)
+        XCTAssertNil(reverse.pages.last?.candidatePage)
+    }
+
     func testRecipeAssertionsObserveCurrentDocumentState() throws {
         let document = PDFDocument()
         let page = PDFPage()

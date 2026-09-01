@@ -115,6 +115,10 @@ struct ContentView: View {
             showSearch: { showNavigator(.search) },
             showAnnotations: { showNavigator(.annotations) },
             showInfo: { showNavigator(.info) },
+            compareDocument: {
+                showNavigator(.info)
+                session.compareWithPicker()
+            },
             previousPage: { session.perform(.previousPage) },
             nextPage: { session.perform(.nextPage) },
             zoomOut: { session.perform(.zoomOut) },

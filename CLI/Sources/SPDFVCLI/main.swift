@@ -116,6 +116,13 @@ private struct SafeShareInspectionReport: Encodable {
     let report: PDFSafeShareReport
 }
 
+private struct CompareOperationReport: Encodable {
+    let operation: String
+    let reference: String
+    let candidate: String
+    let report: PDFComparisonReport
+}
+
 private struct FormFillOperationReport: Encodable {
     let operation: String
     let input: String
@@ -366,6 +373,27 @@ private func safeShare(_ arguments: [String]) throws {
     let document = try PDFOperations.open(url)
     print(try encode(
         SafeShareInspectionReport(input: url.path, report: PDFOperations.safeShareAudit(for: document)),
+        pretty: parser.flags.contains("--pretty")
+    ))
+}
+
+private func compare(_ arguments: [String]) throws {
+    let parser = try OptionParser(arguments)
+    try parser.rejectUnknownOptions(allowing: [])
+    guard parser.positional.count == 2 else {
+        throw CLIError.usage("compare requires a reference PDF and a candidate PDF")
+    }
+    let referenceURL = fileURL(parser.positional[0])
+    let candidateURL = fileURL(parser.positional[1])
+    let reference = try PDFOperations.open(referenceURL)
+    let candidate = try PDFOperations.open(candidateURL)
+    print(try encode(
+        CompareOperationReport(
+            operation: "compare",
+            reference: referenceURL.path,
+            candidate: candidateURL.path,
+            report: try PDFOperations.compare(reference: reference, candidate: candidate)
+        ),
         pretty: parser.flags.contains("--pretty")
     ))
 }
@@ -1070,6 +1098,7 @@ USAGE
   spdfv form-gate <input.pdf> [--pretty]
   spdfv safety-gate <input.pdf> [--pretty]
   spdfv safe-share <input.pdf> [--pretty]
+  spdfv compare <reference.pdf> <candidate.pdf> [--pretty]
   spdfv fill-form <input.pdf> --values <json-object> --output <output.pdf> [--force] [--pretty]
   spdfv add-field <input.pdf> --page <n> --type <text|checkbox|choice> --name <field> --bounds <x,y,w,h> [--value <text>] [--choices <a,b,c>] --output <output.pdf> [--force] [--pretty]
   spdfv rename-field <input.pdf> --from <field> --to <field> --output <output.pdf> [--force] [--pretty]
@@ -1111,6 +1140,7 @@ do {
     case "form-gate": try formGate(Array(arguments.dropFirst()))
     case "safety-gate": try safetyGate(Array(arguments.dropFirst()))
     case "safe-share": try safeShare(Array(arguments.dropFirst()))
+    case "compare": try compare(Array(arguments.dropFirst()))
     case "fill-form": try fillForm(Array(arguments.dropFirst()))
     case "add-field": try addField(Array(arguments.dropFirst()))
     case "rename-field": try renameField(Array(arguments.dropFirst()))

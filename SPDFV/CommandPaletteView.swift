@@ -191,6 +191,10 @@ struct CommandPaletteView: View {
                 item("nav-outline", "Show Contents", "Open the document outline", "NAVIGATE", .outline, shortcut: "⌘2", keywords: ["sidebar", "bookmarks"], action: { showNavigator(.outline) }),
                 item("nav-find", "Find in Document…", "Search the PDF text", "NAVIGATE", .search, shortcut: "⌘F", keywords: ["sidebar", "text"], action: { showNavigator(.search) }),
                 item("nav-info", "Show Document Info", "Review size, permissions, and metadata", "NAVIGATE", .info, shortcut: "⌘3", keywords: ["sidebar", "details"], action: { showNavigator(.info) }),
+                item("compare", "Compare with PDF…", "Find appearance, text, page, annotation, and form differences", "DOCUMENT", .copy, keywords: ["diff", "reference", "changes", "version"], action: {
+                    showNavigator(.info)
+                    session.compareWithPicker()
+                }),
                 item("safe-share", "Run Safe Share Audit", "Check metadata, review marks, filled fields, attachments, and signatures", "DOCUMENT", .secureCopy, keywords: ["privacy", "sanitize", "inspect", "share"], action: {
                     session.runSafeShareAudit()
                     showNavigator(.info)

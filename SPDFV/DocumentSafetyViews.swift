@@ -67,6 +67,30 @@ struct DocumentInfoNavigator: View {
         ScrollView {
             if let details = session.documentDetails {
                 VStack(alignment: .leading, spacing: 22) {
+                    InspectorSection(title: "COMPARE") {
+                        if session.isComparing {
+                            InspectorMessage("Comparing every page’s appearance, text, geometry, and interactive content…")
+                        } else if let report = session.comparisonReport {
+                            InspectorRow(label: "Reference", value: session.comparisonReferenceName ?? "—")
+                            InspectorRow(label: "Result", value: report.status.displayLabel)
+                            InspectorRow(
+                                label: "Pages",
+                                value: "\(report.unchangedPages) same · \(report.changedPages) changed · \(report.addedPages) added · \(report.removedPages) removed"
+                            )
+                            ForEach(report.pages.filter { $0.status != .unchanged }) { page in
+                                ComparisonPageRow(page: page) { session.showComparisonPage(page) }
+                            }
+                            InspectorAction(title: "COMPARE AGAIN", action: session.compareWithPicker)
+                            InspectorAction(title: "CLEAR COMPARISON", action: session.clearComparison)
+                        } else {
+                            InspectorMessage(
+                                "Choose an earlier or authoritative PDF. Comparison reports differences without copying document text into the report."
+                            )
+                            InspectorAction(title: "CHOOSE REFERENCE PDF", action: session.compareWithPicker)
+                                .accessibilityIdentifier("compare.choose-reference")
+                        }
+                    }
+
                     InspectorSection(title: "SAFE SHARE") {
                         if let report = session.safeShareReport {
                             InspectorRow(label: "Result", value: report.level.displayLabel)
@@ -142,6 +166,74 @@ struct DocumentInfoNavigator: View {
                 .padding(16)
             }
         }
+    }
+}
+
+private extension PDFComparisonStatus {
+    var displayLabel: String {
+        switch self {
+        case .identical: "Identical"
+        case .changed: "Changes found"
+        }
+    }
+}
+
+private extension PDFPageComparisonStatus {
+    var displayLabel: String {
+        switch self {
+        case .unchanged: "Same"
+        case .changed: "Changed"
+        case .added: "Added"
+        case .removed: "Removed"
+        }
+    }
+}
+
+private extension PDFPageDifference {
+    var displayLabel: String {
+        switch self {
+        case .appearance: "appearance"
+        case .text: "text"
+        case .dimensions: "size"
+        case .rotation: "rotation"
+        case .annotations: "annotations"
+        case .formFields: "form fields"
+        }
+    }
+}
+
+private struct ComparisonPageRow: View {
+    let page: PDFPageComparison
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(alignment: .top, spacing: 10) {
+                Text("Page")
+                    .foregroundStyle(SPDFVTheme.navigatorMuted)
+                    .frame(width: 62, alignment: .leading)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("\(page.position) · \(page.status.displayLabel)")
+                        .foregroundStyle(SPDFVTheme.navigatorText)
+                    if !page.differences.isEmpty {
+                        Text(page.differences.map(\.displayLabel).joined(separator: ", "))
+                            .foregroundStyle(SPDFVTheme.navigatorMuted)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .font(.system(size: 10))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(page.candidatePage == nil)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(SPDFVTheme.divider).frame(height: 1)
+        }
+        .accessibilityLabel("Page \(page.position), \(page.status.displayLabel)")
+        .accessibilityHint(page.candidatePage == nil ? "This page is absent from the open document" : "Jump to this page")
     }
 }
 

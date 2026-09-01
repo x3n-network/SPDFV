@@ -9,6 +9,7 @@ struct ViewerActions {
     let showSearch: () -> Void
     let showAnnotations: () -> Void
     let showInfo: () -> Void
+    let compareDocument: () -> Void
     let previousPage: () -> Void
     let nextPage: () -> Void
     let zoomOut: () -> Void
@@ -207,6 +208,9 @@ struct SPDFVCommands: Commands {
                 .keyboardShortcut("4")
             Button("Document Info") { actions?.showInfo() }
                 .keyboardShortcut("3")
+
+            Button("Compare with PDF…") { actions?.compareDocument() }
+                .keyboardShortcut("d", modifiers: [.command, .shift])
 
             Divider()
 

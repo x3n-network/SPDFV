@@ -311,6 +311,35 @@ final class SPDFVCLIIntegrationTests: XCTestCase {
         }
     }
 
+    func testCompareEmitsPageByPageMachineReadableReport() throws {
+        try withFixtureDirectory { directory in
+            let referenceURL = directory.appendingPathComponent("reference.pdf")
+            let candidateURL = directory.appendingPathComponent("candidate.pdf")
+            let fixture = try makeCompatibilityFixture()
+            try fixture.write(to: referenceURL)
+            let candidate = try XCTUnwrap(PDFDocument(data: fixture))
+            candidate.page(at: 0)?.rotation = 90
+            let added = PDFPage()
+            added.setBounds(CGRect(x: 0, y: 0, width: 420, height: 600), for: .mediaBox)
+            candidate.insert(added, at: candidate.pageCount)
+            try XCTUnwrap(candidate.dataRepresentation()).write(to: candidateURL)
+
+            let result = try runCLI(["compare", referenceURL.path, candidateURL.path, "--pretty"])
+
+            XCTAssertEqual(result.status, 0, result.stderr)
+            let wrapper = try jsonObject(result.stdout)
+            XCTAssertEqual(wrapper["operation"] as? String, "compare")
+            let report = try XCTUnwrap(wrapper["report"] as? [String: Any])
+            XCTAssertEqual(report["status"] as? String, "changed")
+            XCTAssertEqual(report["referencePageCount"] as? Int, 2)
+            XCTAssertEqual(report["candidatePageCount"] as? Int, 3)
+            XCTAssertEqual(report["addedPages"] as? Int, 1)
+            let pages = try XCTUnwrap(report["pages"] as? [[String: Any]])
+            XCTAssertEqual(pages.map { $0["status"] as? String }, ["changed", "unchanged", "added"])
+            XCTAssertTrue((pages[0]["differences"] as? [String])?.contains("rotation") == true)
+        }
+    }
+
     func testCheckedInCompatibilityCorpusMatchesManifest() throws {
         let corpus = packageRootURL().deletingLastPathComponent()
             .appendingPathComponent("CompatibilityCorpus", isDirectory: true)

@@ -55,11 +55,13 @@ struct WorkspaceBench: View {
             SquareToolButton(icon: .pages, help: "Show pages") { showNavigator(.pages) }
             SquareToolButton(icon: .outline, help: "Show contents") { showNavigator(.outline) }
             SquareToolButton(icon: .search, help: "Find in document") { showNavigator(.search) }
+            SquareToolButton(icon: .copy, help: "Compare with another PDF") { compareDocument() }
         } else {
             BenchButton("Pages", icon: .pages) { showNavigator(.pages) }
             BenchButton("Contents", icon: .outline) { showNavigator(.outline) }
             BenchButton("Find", icon: .search) { showNavigator(.search) }
-            status("Document ready")
+            BenchButton("Compare", icon: .copy) { compareDocument() }
+            status(comparisonStatus)
         }
     }
 
@@ -313,6 +315,20 @@ struct WorkspaceBench: View {
     private func showNavigator(_ navigatorMode: NavigatorMode) {
         session.thumbnailsVisible = true
         session.navigatorMode = navigatorMode
+    }
+
+    private func compareDocument() {
+        showNavigator(.info)
+        session.compareWithPicker()
+    }
+
+    private var comparisonStatus: String {
+        if session.isComparing { return "Comparing…" }
+        switch session.comparisonReport?.status {
+        case .identical: return "Documents identical"
+        case .changed: return "Changes found"
+        case nil: return "Document ready"
+        }
     }
 
     private func openRecipeWorkspace() {
