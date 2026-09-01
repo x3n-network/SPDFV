@@ -278,6 +278,11 @@ private struct FormDataStudioPlate: View {
                     .disabled(session.formFields.isEmpty)
                     .accessibilityIdentifier("form-data.export")
             }
+            Button("BATCH CSV / TSV…") {
+                BatchFormDataWorkspaceWindowManager.shared.open(for: session)
+            }
+            .buttonStyle(SidebarButtonStyle(prominent: false))
+            .accessibilityIdentifier("form-data.batch.open")
         }
         .padding(12)
         .background(SPDFVTheme.navigatorInset)

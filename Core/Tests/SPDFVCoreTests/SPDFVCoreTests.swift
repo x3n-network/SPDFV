@@ -367,6 +367,89 @@ final class SPDFVCoreTests: XCTestCase {
         XCTAssertFalse(json.contains("PAGE-1"))
     }
 
+    func testBatchFormDataMapsCSVRowsAndProducesUniqueVerifiedPDFs() throws {
+        let document = PDFDocument()
+        let page = PDFPage()
+        page.setBounds(CGRect(x: 0, y: 0, width: 612, height: 792), for: .mediaBox)
+        document.insert(page, at: 0)
+        try PDFOperations.addFormField(
+            PDFFormFieldDraft(name: "full_name", kind: .text),
+            to: document,
+            pageIndex: 0,
+            bounds: CGRect(x: 72, y: 650, width: 220, height: 32)
+        )
+        try PDFOperations.addFormField(
+            PDFFormFieldDraft(name: "status", kind: .choice, choices: ["Review", "Approved"]),
+            to: document,
+            pageIndex: 0,
+            bounds: CGRect(x: 72, y: 600, width: 220, height: 32)
+        )
+        let template = try XCTUnwrap(document.dataRepresentation())
+        let table = Data("Person,Decision,File ID\n\"Lovelace, Ada\",Approved,A-01\nGrace Hopper,Review,A-02\n".utf8)
+        let mapping = PDFFormDataBatchMapping(
+            columns: [
+                PDFFormDataColumnMapping(column: "Person", field: "full_name"),
+                PDFFormDataColumnMapping(column: "Decision", field: "status")
+            ],
+            filenameTemplate: "case-{File ID}.pdf"
+        )
+
+        let summary = try PDFOperations.formDataTableSummary(table, format: .csv)
+        XCTAssertEqual(summary.columns, ["Person", "Decision", "File ID"])
+        XCTAssertEqual(summary.rowCount, 2)
+        XCTAssertEqual(try PDFOperations.decodeFormDataBatchMapping(PDFOperations.encodeFormDataBatchMapping(mapping)), mapping)
+
+        let result = try PDFOperations.fillFormBatch(
+            templateData: template,
+            tableData: table,
+            format: .csv,
+            mapping: mapping
+        )
+        XCTAssertTrue(result.report.canWrite)
+        XCTAssertEqual(result.report.validRows, 2)
+        XCTAssertEqual(result.outputs.map(\.name), ["case-A-01.pdf", "case-A-02.pdf"])
+        let first = try XCTUnwrap(PDFDocument(data: result.outputs[0].data))
+        let values = Dictionary(uniqueKeysWithValues: PDFOperations.formReport(for: first).fields.map { ($0.name, $0.value) })
+        XCTAssertEqual(values["full_name"], "Lovelace, Ada")
+        XCTAssertEqual(values["status"], "Approved")
+    }
+
+    func testBatchFormDataPreflightsEveryRowBeforeProducingAnything() throws {
+        let document = PDFDocument()
+        let page = PDFPage()
+        page.setBounds(CGRect(x: 0, y: 0, width: 612, height: 792), for: .mediaBox)
+        document.insert(page, at: 0)
+        try PDFOperations.addFormField(
+            PDFFormFieldDraft(name: "status", kind: .choice, choices: ["Review", "Approved"]),
+            to: document,
+            pageIndex: 0,
+            bounds: CGRect(x: 72, y: 600, width: 220, height: 32)
+        )
+        let template = try XCTUnwrap(document.dataRepresentation())
+        let table = Data("Status\nReview\nRejected\n".utf8)
+        let mapping = PDFFormDataBatchMapping(
+            columns: [PDFFormDataColumnMapping(column: "Status", field: "status")],
+            filenameTemplate: "same.pdf"
+        )
+
+        let report = try PDFOperations.validateFormDataBatch(
+            templateData: template,
+            tableData: table,
+            format: .tsv,
+            mapping: mapping
+        )
+        XCTAssertFalse(report.canWrite)
+        XCTAssertEqual(report.invalidRows, 1)
+        XCTAssertTrue(report.items[1].validation?.issues.contains { $0.kind == .invalidChoice } == true)
+        XCTAssertTrue(report.items[1].errors.contains { $0.contains("duplicate") })
+        XCTAssertThrowsError(try PDFOperations.fillFormBatch(
+            templateData: template,
+            tableData: table,
+            format: .tsv,
+            mapping: mapping
+        ))
+    }
+
     func testDocumentDoctorPlansAndVerifiesMetadataRepairOnCopy() throws {
         let document = makeDocument(pageNumbers: [1, 2])
         document.documentAttributes = [

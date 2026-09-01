@@ -15,6 +15,7 @@ The interface is deliberately compact. It is not a web view in a desktop shell, 
 - Reorder, rotate, duplicate, extract, append, crop, and delete pages
 - Inspect, fill, create, rename, and validate interactive form fields
 - Exchange form values through a versioned JSON Data Studio with preflight validation and atomic undo
+- Generate one completed PDF per CSV/TSV row with reusable alias mappings, filename templates, and all-rows preflight
 - Preflight document protections and unlock password-protected PDFs without retaining the password
 - Audit metadata, review annotations, filled forms, attachments, and signatures before sharing without copying private values into the report
 - Compare a working PDF with a reference using intelligent page alignment, configurable appearance tolerance and ignored regions, side-by-side/overlay/heatmap views, and exportable privacy-conscious reports

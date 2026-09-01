@@ -421,6 +421,52 @@ final class SPDFVCLIIntegrationTests: XCTestCase {
         }
     }
 
+    func testBatchFormDataPreflightsThenWritesOnePDFPerCSVRow() throws {
+        try withFixtureDirectory { directory in
+            let input = directory.appendingPathComponent("template.pdf")
+            let table = directory.appendingPathComponent("rows.csv")
+            let mappingURL = directory.appendingPathComponent("mapping.json")
+            let outputDirectory = directory.appendingPathComponent("completed", isDirectory: true)
+            let document = PDFDocument()
+            let page = PDFPage()
+            page.setBounds(CGRect(x: 0, y: 0, width: 612, height: 792), for: .mediaBox)
+            document.insert(page, at: 0)
+            try PDFOperations.addFormField(
+                PDFFormFieldDraft(name: "full_name", kind: .text),
+                to: document,
+                pageIndex: 0,
+                bounds: CGRect(x: 72, y: 650, width: 220, height: 32)
+            )
+            try XCTUnwrap(document.dataRepresentation()).write(to: input)
+            try Data("Person,Case\nAda Lovelace,101\nGrace Hopper,102\n".utf8).write(to: table)
+            let mapping = PDFFormDataBatchMapping(
+                columns: [PDFFormDataColumnMapping(column: "Person", field: "full_name")],
+                filenameTemplate: "case-{Case}.pdf"
+            )
+            try PDFOperations.encodeFormDataBatchMapping(mapping).write(to: mappingURL)
+
+            let preview = try runCLI([
+                "batch-form-data", input.path, "--data", table.path,
+                "--mapping", mappingURL.path, "--dry-run", "--pretty"
+            ])
+            XCTAssertEqual(preview.status, 0, preview.stderr)
+            let previewReport = try XCTUnwrap(try jsonObject(preview.stdout)["report"] as? [String: Any])
+            XCTAssertEqual(previewReport["canWrite"] as? Bool, true)
+            XCTAssertEqual(previewReport["validRows"] as? Int, 2)
+            XCTAssertFalse(FileManager.default.fileExists(atPath: outputDirectory.path))
+
+            let run = try runCLI([
+                "batch-form-data", input.path, "--data", table.path,
+                "--mapping", mappingURL.path, "--output-dir", outputDirectory.path, "--pretty"
+            ])
+            XCTAssertEqual(run.status, 0, run.stderr)
+            let names = try FileManager.default.contentsOfDirectory(atPath: outputDirectory.path).sorted()
+            XCTAssertEqual(names, ["case-101.pdf", "case-102.pdf"])
+            let first = try XCTUnwrap(PDFDocument(url: outputDirectory.appendingPathComponent(names[0])))
+            XCTAssertEqual(PDFOperations.formReport(for: first).fields.first?.value, "Ada Lovelace")
+        }
+    }
+
     func testDoctorRepairWritesVerifiedMetadataCleanCopy() throws {
         try withFixtureDirectory { directory in
             let input = directory.appendingPathComponent("diagnostic.pdf")

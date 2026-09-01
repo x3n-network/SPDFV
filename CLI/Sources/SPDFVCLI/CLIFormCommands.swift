@@ -69,6 +69,124 @@ func importFormData(_ arguments: [String]) throws {
     print(try encode(FormDataImportOperationReport(operation: "import-form-data", input: inputURL.path, data: dataURL.path, output: outputURL.path, validation: validation, report: result.report), pretty: parser.flags.contains("--pretty")))
 }
 
+func formDataMappingTemplate(_ arguments: [String]) throws {
+    let parser = try OptionParser(arguments)
+    try parser.rejectUnknownOptions(allowing: ["--data", "--output", "--filename", "--format"])
+    guard parser.positional.count == 1 else {
+        throw CLIError.usage("form-data-mapping-template requires exactly one template PDF")
+    }
+    let inputURL = fileURL(parser.positional[0])
+    let dataURL = fileURL(try parser.requireOption("--data"))
+    let outputURL = fileURL(try parser.requireOption("--output"))
+    if FileManager.default.fileExists(atPath: outputURL.path), !parser.flags.contains("--force") {
+        throw CLIError.failure("Output already exists; pass --force to replace it: \(outputURL.path)")
+    }
+    let format = try formDataTableFormat(parser.options["--format"], url: dataURL)
+    let document = try PDFOperations.open(inputURL)
+    let suggested = try PDFOperations.suggestedFormDataBatchMapping(
+        tableData: Data(contentsOf: dataURL),
+        format: format,
+        for: document
+    )
+    let mapping = PDFFormDataBatchMapping(
+        columns: suggested.columns,
+        filenameTemplate: parser.options["--filename"] ?? suggested.filenameTemplate
+    )
+    try PDFOperations.encodeFormDataBatchMapping(mapping).write(to: outputURL, options: .atomic)
+    print(try encode(
+        FormDataBatchMappingOperationReport(
+            operation: "form-data-mapping-template",
+            input: inputURL.path,
+            data: dataURL.path,
+            output: outputURL.path,
+            mapping: mapping
+        ),
+        pretty: parser.flags.contains("--pretty")
+    ))
+}
+
+func batchFormData(_ arguments: [String]) throws {
+    let parser = try OptionParser(arguments)
+    try parser.rejectUnknownOptions(allowing: ["--data", "--mapping", "--filename", "--format", "--output-dir"])
+    guard parser.positional.count == 1 else {
+        throw CLIError.usage("batch-form-data requires exactly one template PDF")
+    }
+    let inputURL = fileURL(parser.positional[0])
+    let dataURL = fileURL(try parser.requireOption("--data"))
+    let format = try formDataTableFormat(parser.options["--format"], url: dataURL)
+    let templateData = try Data(contentsOf: inputURL)
+    let tableData = try Data(contentsOf: dataURL)
+    let document = try PDFOperations.open(inputURL)
+    let baseMapping: PDFFormDataBatchMapping
+    if let mappingPath = parser.options["--mapping"] {
+        baseMapping = try PDFOperations.decodeFormDataBatchMapping(Data(contentsOf: fileURL(mappingPath)))
+    } else {
+        baseMapping = try PDFOperations.suggestedFormDataBatchMapping(
+            tableData: tableData,
+            format: format,
+            for: document
+        )
+    }
+    let mapping = PDFFormDataBatchMapping(
+        columns: baseMapping.columns,
+        filenameTemplate: parser.options["--filename"] ?? baseMapping.filenameTemplate
+    )
+    let report = try PDFOperations.validateFormDataBatch(
+        templateData: templateData,
+        tableData: tableData,
+        format: format,
+        mapping: mapping
+    )
+    let dryRun = parser.flags.contains("--dry-run")
+    var outputDirectory: URL?
+    if !dryRun {
+        guard report.canWrite else {
+            throw CLIError.failure("Batch validation failed; no PDFs were written")
+        }
+        let directory = fileURL(try parser.requireOption("--output-dir"))
+        let destinations = report.items.compactMap(\.outputName).map { directory.appendingPathComponent($0) }
+        if !parser.flags.contains("--force"), let existing = destinations.first(where: { FileManager.default.fileExists(atPath: $0.path) }) {
+            throw CLIError.failure("Output already exists; pass --force to replace it: \(existing.path)")
+        }
+        let result = try PDFOperations.fillFormBatch(
+            templateData: templateData,
+            tableData: tableData,
+            format: format,
+            mapping: mapping
+        )
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        for output in result.outputs {
+            try output.data.write(to: directory.appendingPathComponent(output.name), options: .atomic)
+        }
+        outputDirectory = directory
+    }
+    print(try encode(
+        FormDataBatchOperationReport(
+            operation: "batch-form-data",
+            input: inputURL.path,
+            data: dataURL.path,
+            outputDirectory: outputDirectory?.path,
+            dryRun: dryRun,
+            report: report
+        ),
+        pretty: parser.flags.contains("--pretty")
+    ))
+}
+
+private func formDataTableFormat(_ explicit: String?, url: URL) throws -> PDFFormDataTableFormat {
+    if let explicit {
+        guard let format = PDFFormDataTableFormat(rawValue: explicit.lowercased()) else {
+            throw CLIError.usage("--format must be csv or tsv")
+        }
+        return format
+    }
+    switch url.pathExtension.lowercased() {
+    case "csv": return .csv
+    case "tsv", "tab": return .tsv
+    default: throw CLIError.usage("Use a .csv or .tsv data file, or pass --format")
+    }
+}
+
 func fillForm(_ arguments: [String]) throws {
     let parser = try OptionParser(arguments)
     try parser.rejectUnknownOptions(allowing: ["--values", "--output"])

@@ -128,6 +128,23 @@ struct FormDataImportOperationReport: Encodable {
     let report: PDFFormReport
 }
 
+struct FormDataBatchMappingOperationReport: Encodable {
+    let operation: String
+    let input: String
+    let data: String
+    let output: String
+    let mapping: PDFFormDataBatchMapping
+}
+
+struct FormDataBatchOperationReport: Encodable {
+    let operation: String
+    let input: String
+    let data: String
+    let outputDirectory: String?
+    let dryRun: Bool
+    let report: PDFFormDataBatchReport
+}
+
 struct SafetyGateInspectionReport: Encodable {
     let input: String
     let gate: PDFSafetyGateReport

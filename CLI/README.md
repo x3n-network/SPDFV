@@ -11,6 +11,9 @@ CLI/.build/release/spdfv form-gate intake.pdf --pretty
 CLI/.build/release/spdfv export-form-data intake.pdf --output intake-values.json --pretty
 CLI/.build/release/spdfv validate-form-data intake.pdf --data completed-values.json --pretty
 CLI/.build/release/spdfv import-form-data intake.pdf --data completed-values.json --output completed.pdf --pretty
+CLI/.build/release/spdfv form-data-mapping-template intake.pdf --data recipients.csv --output mapping.json --filename 'case-{Case ID}.pdf'
+CLI/.build/release/spdfv batch-form-data intake.pdf --data recipients.csv --mapping mapping.json --dry-run --pretty
+CLI/.build/release/spdfv batch-form-data intake.pdf --data recipients.csv --mapping mapping.json --output-dir ./completed --pretty
 CLI/.build/release/spdfv safety-gate intake.pdf --pretty
 CLI/.build/release/spdfv safe-share review-copy.pdf --pretty
 CLI/.build/release/spdfv compare approved.pdf working-copy.pdf --alignment intelligent --appearance-threshold 0.995 --ignore-regions '0,0,1,0.05' --pretty
@@ -57,6 +60,8 @@ Page specifications are one-based, accept comma-separated inclusive ranges, and 
 `rename-field` updates a logical field name across every repeated widget, rejects collisions, normalizes the canonical field tree, and verifies appearances before writing the output.
 
 Form Data Studio files are versioned JSON containing writable field names and values. `export-form-data` deliberately exports private values, `validate-form-data` reports missing, duplicate, read-only, unsupported, conflicting, and invalid-choice fields without echoing their values, and `import-form-data` writes only after the complete file passes validation. The native Fields → Data workbench uses the same contract and applies a valid import as one undoable edit.
+
+Batch Form Data accepts quote-aware UTF-8 CSV or TSV tables and generates one completed PDF per row. Exact column/field names map automatically; `form-data-mapping-template` creates a versioned JSON mapping that can be edited for aliases and reused. Filename templates accept `{row}` and table headers such as `{Case ID}`. `batch-form-data --dry-run` checks every row, mapped choice, and output name without writing; a real run refuses to write anything unless the entire preflight passes. The native Batch Form Data workspace provides the same mapping, save/load, preflight, and generation flow.
 
 ## Recipes
 

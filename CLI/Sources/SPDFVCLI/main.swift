@@ -316,6 +316,8 @@ USAGE
   spdfv export-form-data <input.pdf> --output <data.json> [--force] [--pretty]
   spdfv validate-form-data <input.pdf> --data <data.json> [--pretty]
   spdfv import-form-data <input.pdf> --data <data.json> --output <output.pdf> [--force] [--pretty]
+  spdfv form-data-mapping-template <input.pdf> --data <rows.csv|rows.tsv> --output <mapping.json> [--filename <template>] [--format <csv|tsv>] [--force] [--pretty]
+  spdfv batch-form-data <input.pdf> --data <rows.csv|rows.tsv> [--mapping <mapping.json>] [--filename <template>] [--format <csv|tsv>] [--output-dir <directory>] [--dry-run] [--force] [--pretty]
   spdfv safety-gate <input.pdf> [--pretty]
   spdfv safe-share <input.pdf> [--pretty]
   spdfv compare <reference.pdf> <candidate.pdf> [--alignment <intelligent|position>] [--appearance-threshold <0...1>] [--ignore-regions <x,y,w,h;...>] [--pretty]
@@ -363,6 +365,8 @@ do {
     case "export-form-data": try exportFormData(Array(arguments.dropFirst()))
     case "validate-form-data": try validateFormData(Array(arguments.dropFirst()))
     case "import-form-data": try importFormData(Array(arguments.dropFirst()))
+    case "form-data-mapping-template": try formDataMappingTemplate(Array(arguments.dropFirst()))
+    case "batch-form-data": try batchFormData(Array(arguments.dropFirst()))
     case "safety-gate": try safetyGate(Array(arguments.dropFirst()))
     case "safe-share": try safeShare(Array(arguments.dropFirst()))
     case "compare": try compare(Array(arguments.dropFirst()))
