@@ -387,6 +387,26 @@ final class SPDFVCLIIntegrationTests: XCTestCase {
         }
     }
 
+    func testDoctorEmitsPrioritizedPrivacyConsciousReport() throws {
+        try withFixtureDirectory { directory in
+            let input = directory.appendingPathComponent("diagnostic.pdf")
+            try makeCompatibilityFixture().write(to: input)
+
+            let result = try runCLI(["doctor", input.path, "--pretty"])
+
+            XCTAssertEqual(result.status, 0, result.stderr)
+            let wrapper = try jsonObject(result.stdout)
+            let report = try XCTUnwrap(wrapper["report"] as? [String: Any])
+            XCTAssertEqual(report["level"] as? String, "attention")
+            XCTAssertEqual(report["pageCount"] as? Int, 2)
+            XCTAssertEqual(report["rotatedPages"] as? Int, 1)
+            let issues = try XCTUnwrap(report["issues"] as? [[String: Any]])
+            XCTAssertTrue(issues.contains { $0["id"] as? String == "mixed-page-sizes" })
+            XCTAssertTrue(issues.contains { $0["id"] as? String == "privacy-document-metadata" })
+            XCTAssertFalse(result.stdout.contains("SPDFV Compatibility Fixture"))
+        }
+    }
+
     func testCheckedInCompatibilityCorpusMatchesManifest() throws {
         let corpus = packageRootURL().deletingLastPathComponent()
             .appendingPathComponent("CompatibilityCorpus", isDirectory: true)

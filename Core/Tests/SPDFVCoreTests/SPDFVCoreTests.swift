@@ -346,6 +346,27 @@ final class SPDFVCoreTests: XCTestCase {
         XCTAssertEqual(values["status"], "Approved")
     }
 
+    func testDocumentDoctorPrioritizesIssuesWithoutCopyingPrivateContent() throws {
+        let document = makeDocument(pageNumbers: [1, 2])
+        document.documentAttributes = [PDFDocumentAttribute.authorAttribute: "Private Author"]
+        document.page(at: 1)?.rotation = 90
+
+        let report = PDFOperations.diagnose(document)
+
+        XCTAssertEqual(report.level, .attention)
+        XCTAssertEqual(report.pageCount, 2)
+        XCTAssertEqual(report.searchablePages, 0)
+        XCTAssertEqual(report.rotatedPages, 1)
+        XCTAssertTrue(report.issues.contains { $0.id == "no-searchable-text" && $0.action == .runOCR })
+        XCTAssertTrue(report.issues.contains { $0.id == "rotated-pages" && $0.pages == [2] })
+        XCTAssertTrue(report.issues.contains { $0.id == "privacy-document-metadata" })
+        XCTAssertTrue(report.issues.contains { $0.id == "privacy-review-annotations" })
+        XCTAssertEqual(report.recommendedActions.first, .runOCR)
+        let json = String(decoding: try JSONEncoder().encode(report), as: UTF8.self)
+        XCTAssertFalse(json.contains("Private Author"))
+        XCTAssertFalse(json.contains("PAGE-1"))
+    }
+
     func testFormAuthoringCreatesCanonicalInteractiveFields() throws {
         let document = PDFDocument()
         let page = PDFPage()

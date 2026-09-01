@@ -195,6 +195,10 @@ struct CommandPaletteView: View {
                     showNavigator(.info)
                     session.compareWithPicker()
                 }),
+                item("doctor", "Run Document Doctor", "Diagnose access, pages, text, forms, and sharing hazards", "DOCUMENT", .warning, keywords: ["health", "diagnose", "repair", "preflight"], action: {
+                    session.runDocumentDoctor()
+                    showNavigator(.info)
+                }),
                 item("safe-share", "Run Safe Share Audit", "Check metadata, review marks, filled fields, attachments, and signatures", "DOCUMENT", .secureCopy, keywords: ["privacy", "sanitize", "inspect", "share"], action: {
                     session.runSafeShareAudit()
                     showNavigator(.info)

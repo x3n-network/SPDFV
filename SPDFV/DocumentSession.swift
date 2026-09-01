@@ -23,6 +23,7 @@ final class DocumentSession: ObservableObject {
     @Published private(set) var documentDetails: DocumentDetails?
     @Published private(set) var safetyGate: PDFSafetyGateReport?
     @Published private(set) var safeShareReport: PDFSafeShareReport?
+    @Published private(set) var doctorReport: PDFDoctorReport?
     @Published var comparisonReport: PDFComparisonReport?
     @Published var comparisonReferenceName: String?
     @Published var isComparing = false
@@ -163,6 +164,7 @@ final class DocumentSession: ObservableObject {
         fileURL = url
         safetyGate = PDFOperations.safetyGate(for: pdf)
         safeShareReport = nil
+        doctorReport = nil
         comparisonReport = nil
         comparisonReferenceName = nil
         isComparing = false
@@ -463,6 +465,7 @@ final class DocumentSession: ObservableObject {
     func markDirty() {
         isDirty = true
         safeShareReport = nil
+        doctorReport = nil
         DocumentRecoveryStore.shared.scheduleSnapshot(for: self)
     }
 
@@ -472,6 +475,36 @@ final class DocumentSession: ObservableObject {
             return
         }
         safeShareReport = PDFOperations.safeShareAudit(for: document)
+    }
+
+    func runDocumentDoctor() {
+        guard let document else {
+            doctorReport = nil
+            return
+        }
+        doctorReport = PDFOperations.diagnose(document)
+    }
+
+    func performDoctorAction(_ issue: PDFDoctorIssue) {
+        guard let action = issue.action else { return }
+        thumbnailsVisible = true
+        switch action {
+        case .unlockDocument, .reviewPermissions:
+            navigatorMode = .info
+        case .inspectPages:
+            navigatorMode = .pages
+            if let first = issue.pages.first { goToPage(first - 1) }
+        case .runOCR:
+            navigatorMode = .pages
+            if !issue.pages.isEmpty { selectedPageIndices = Set(issue.pages.map { $0 - 1 }) }
+        case .normalizeForms, .reviewForms:
+            navigatorMode = .forms
+        case .runSafeShare:
+            runSafeShareAudit()
+            navigatorMode = .info
+        case .reviewAnnotations:
+            navigatorMode = .annotations
+        }
     }
 
     func markClean() {

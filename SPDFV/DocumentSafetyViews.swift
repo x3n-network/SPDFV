@@ -67,6 +67,29 @@ struct DocumentInfoNavigator: View {
         ScrollView {
             if let details = session.documentDetails {
                 VStack(alignment: .leading, spacing: 22) {
+                    InspectorSection(title: "DOCUMENT DOCTOR") {
+                        if let report = session.doctorReport {
+                            InspectorRow(label: "Result", value: report.level.displayLabel)
+                            InspectorRow(label: "Text", value: "\(report.searchablePages)/\(report.pageCount) searchable pages")
+                            InspectorRow(label: "Forms", value: "\(report.formWidgets) widgets")
+                            InspectorRow(label: "Review", value: "\(report.reviewAnnotations) annotations")
+                            if report.issues.isEmpty {
+                                InspectorMessage("No access, page, text, form, or sharing issues were detected.")
+                            } else {
+                                ForEach(report.issues) { issue in
+                                    DoctorIssueRow(issue: issue) { session.performDoctorAction(issue) }
+                                }
+                            }
+                            InspectorAction(title: "RUN AGAIN", action: session.runDocumentDoctor)
+                        } else {
+                            InspectorMessage(
+                                "Run one privacy-conscious diagnostic across access, pages, searchable text, forms, and sharing hazards."
+                            )
+                            InspectorAction(title: "RUN DOCUMENT DOCTOR", action: session.runDocumentDoctor)
+                                .accessibilityIdentifier("doctor.run")
+                        }
+                    }
+
                     InspectorSection(title: "COMPARE") {
                         if session.isComparing {
                             InspectorMessage("Comparing every page’s appearance, text, geometry, and interactive content…")
@@ -166,6 +189,57 @@ struct DocumentInfoNavigator: View {
                 .padding(16)
             }
         }
+    }
+}
+
+private extension PDFDoctorLevel {
+    var displayLabel: String {
+        switch self {
+        case .healthy: "Healthy"
+        case .attention: "Needs attention"
+        case .critical: "Critical"
+        }
+    }
+}
+
+private extension PDFDoctorAction {
+    var displayLabel: String {
+        switch self {
+        case .unlockDocument: "UNLOCK DOCUMENT"
+        case .reviewPermissions: "REVIEW PERMISSIONS"
+        case .inspectPages: "INSPECT PAGES"
+        case .runOCR: "SELECT FOR OCR"
+        case .normalizeForms: "REVIEW FORM REPAIR"
+        case .reviewForms: "REVIEW FORMS"
+        case .runSafeShare: "RUN SAFE SHARE"
+        case .reviewAnnotations: "REVIEW ANNOTATIONS"
+        }
+    }
+}
+
+private struct DoctorIssueRow: View {
+    let issue: PDFDoctorIssue
+    let action: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(issue.title)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(issue.level == .critical ? SPDFVTheme.redaction : SPDFVTheme.navigatorText)
+            Text(issue.detail)
+                .font(.system(size: 9))
+                .foregroundStyle(SPDFVTheme.navigatorMuted)
+                .fixedSize(horizontal: false, vertical: true)
+            if let recommendation = issue.action {
+                Button(recommendation.displayLabel, action: action)
+                    .buttonStyle(.plain)
+                    .font(.system(size: 8, weight: .black, design: .monospaced))
+                    .foregroundStyle(SPDFVTheme.paleCobalt)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .overlay(alignment: .bottom) { Rectangle().fill(SPDFVTheme.divider).frame(height: 1) }
     }
 }
 

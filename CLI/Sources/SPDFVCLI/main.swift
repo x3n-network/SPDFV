@@ -146,6 +146,11 @@ private struct CompareOperationReport: Encodable {
     let report: PDFComparisonReport
 }
 
+private struct DoctorInspectionReport: Encodable {
+    let input: String
+    let report: PDFDoctorReport
+}
+
 private struct FormFillOperationReport: Encodable {
     let operation: String
     let input: String
@@ -500,6 +505,20 @@ private func compare(_ arguments: [String]) throws {
             candidate: candidateURL.path,
             report: try PDFOperations.compare(reference: reference, candidate: candidate)
         ),
+        pretty: parser.flags.contains("--pretty")
+    ))
+}
+
+private func doctor(_ arguments: [String]) throws {
+    let parser = try OptionParser(arguments)
+    try parser.rejectUnknownOptions(allowing: [])
+    guard parser.positional.count == 1 else {
+        throw CLIError.usage("doctor requires exactly one input PDF")
+    }
+    let url = fileURL(parser.positional[0])
+    let document = try PDFOperations.open(url)
+    print(try encode(
+        DoctorInspectionReport(input: url.path, report: PDFOperations.diagnose(document)),
         pretty: parser.flags.contains("--pretty")
     ))
 }
@@ -1208,6 +1227,7 @@ USAGE
   spdfv safety-gate <input.pdf> [--pretty]
   spdfv safe-share <input.pdf> [--pretty]
   spdfv compare <reference.pdf> <candidate.pdf> [--pretty]
+  spdfv doctor <input.pdf> [--pretty]
   spdfv fill-form <input.pdf> --values <json-object> --output <output.pdf> [--force] [--pretty]
   spdfv add-field <input.pdf> --page <n> --type <text|checkbox|choice> --name <field> --bounds <x,y,w,h> [--value <text>] [--choices <a,b,c>] --output <output.pdf> [--force] [--pretty]
   spdfv rename-field <input.pdf> --from <field> --to <field> --output <output.pdf> [--force] [--pretty]
@@ -1253,6 +1273,7 @@ do {
     case "safety-gate": try safetyGate(Array(arguments.dropFirst()))
     case "safe-share": try safeShare(Array(arguments.dropFirst()))
     case "compare": try compare(Array(arguments.dropFirst()))
+    case "doctor": try doctor(Array(arguments.dropFirst()))
     case "fill-form": try fillForm(Array(arguments.dropFirst()))
     case "add-field": try addField(Array(arguments.dropFirst()))
     case "rename-field": try renameField(Array(arguments.dropFirst()))

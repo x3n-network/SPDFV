@@ -289,9 +289,12 @@ final class DocumentSessionTests: XCTestCase {
         let report = try XCTUnwrap(session.safeShareReport)
         XCTAssertFalse(report.locked)
         XCTAssertEqual(report.pages, 1)
+        session.runDocumentDoctor()
+        XCTAssertNotNil(session.doctorReport)
 
         session.rotateCurrentPage(clockwise: true)
         XCTAssertNil(session.safeShareReport)
+        XCTAssertNil(session.doctorReport)
     }
 
     private func makePDF(
