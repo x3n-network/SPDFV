@@ -10,6 +10,7 @@
 - Expanded executable-level CLI tests across annotations, page assembly and crop, form authoring, recipes, and durable queues
 - Added an MIT-licensed, manifest-backed compatibility corpus for mixed page geometry, interactive forms, and encrypted-document preflight
 - Added clock-metric performance coverage for 250-page inspection and a 60-page multi-step recipe pipeline
+- Hardened macOS releases with monotonic version/build preflight, clean-tree enforcement, credential-free rehearsal, bundle-content verification, and atomic appcast validation
 
 ## 0.1.2 - 2026-08-31
 

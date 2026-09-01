@@ -20,6 +20,10 @@ if [[ ! -f "$dmg_path" ]]; then
     echo "Update archive not found: $dmg_path"
     exit 66
 fi
+if [[ "$(basename "$dmg_path")" != "SPDFV-$version.dmg" ]]; then
+    echo "Update archive must be named SPDFV-$version.dmg"
+    exit 64
+fi
 
 generate_appcast="${SPARKLE_GENERATE_APPCAST:-}"
 if [[ -z "$generate_appcast" ]]; then
@@ -59,7 +63,17 @@ fi
     -o "$appcast_tmp/appcast.xml" \
     "$appcast_tmp"
 
+if ! grep -q "<sparkle:shortVersionString>$version</sparkle:shortVersionString>" "$appcast_tmp/appcast.xml"; then
+    echo "Generated appcast does not contain version $version."
+    exit 70
+fi
+if command -v xmllint >/dev/null 2>&1; then
+    xmllint --noout "$appcast_tmp/appcast.xml"
+fi
+
 mkdir -p "$(dirname "$appcast_path")"
-cp "$appcast_tmp/appcast.xml" "$appcast_path"
+pending_appcast="$appcast_path.pending"
+cp "$appcast_tmp/appcast.xml" "$pending_appcast"
+mv "$pending_appcast" "$appcast_path"
 
 echo "Sparkle appcast updated: $appcast_path"

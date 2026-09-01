@@ -34,6 +34,18 @@ Core performance tests record XCTest clock metrics for large-document inspection
 
 By submitting a contribution, you agree that it may be distributed under the project’s [MIT License](LICENSE).
 
+## Release rehearsal
+
+Before tagging a release, commit all intended changes and rehearse the next semantic version without signing credentials:
+
+```sh
+bash Scripts/release_macos.sh 0.1.3 --dry-run
+```
+
+The rehearsal requires a clean worktree, derives the next build number from the project, rejects versions or builds that would go backward relative to the project and Sparkle appcast, runs all release gates, builds an unsigned Release app in a temporary directory, and verifies its embedded version, build, queue runner, Sparkle framework, feed URL, and public key. It leaves no archive, notarization request, appcast change, or `dist` artifact.
+
+For a temporary dirty-tree rehearsal, set `ALLOW_DIRTY=1`. Use `BUILD_NUMBER` only to select a higher build explicitly, and use `RUN_TESTS=0` only when tests were already run in the same CI job. Running the script without `--dry-run` additionally requires a Developer ID Application certificate and the configured notarytool keychain profile.
+
 ## Reports
 
 A useful bug report includes the macOS version, SPDFV build, exact operation, expected result, actual result, and whether the PDF contains forms, encryption, signatures, or scanned pages. Do not attach a private document; make a reduced sample that contains no sensitive information.
