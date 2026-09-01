@@ -58,6 +58,9 @@ final class DocumentSession: ObservableObject {
     @Published var lastRecipeOutputURL: URL?
     @Published var batchRecipeReport: PDFRecipeBatchReport?
     @Published var lastBatchOutputDirectory: URL?
+    @Published var recipeParameterValues: [String: String] = [:]
+    @Published var recipeReferences: [String: Data] = [:]
+    @Published var recipeFormDataSources: [String: PDFFormDataFile] = [:]
     @Published var isRunningRecipe = false
     @Published var signatureDraft: SignatureDraft?
     @Published var pendingFormFieldDraft: PDFFormFieldDraft?

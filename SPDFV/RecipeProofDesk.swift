@@ -19,6 +19,10 @@ struct RecipeProofDesk: View {
             .frame(height: min(CGFloat(recipe.steps.count * 48 + 16), 230))
 
             Rectangle().fill(SPDFVTheme.divider).frame(height: 1)
+            if !recipe.parameters.isEmpty || !recipe.requiredReferenceNames.isEmpty || !recipe.requiredFormDataNames.isEmpty {
+                executionInputs
+                Rectangle().fill(SPDFVTheme.divider).frame(height: 1)
+            }
             verificationPlate
             Rectangle().fill(SPDFVTheme.divider).frame(height: 1)
 
@@ -43,6 +47,59 @@ struct RecipeProofDesk: View {
             .padding(.top, 8)
             .padding(.bottom, 14)
         }
+    }
+
+    private var executionInputs: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("RUN INPUTS")
+                .font(.system(size: 8, weight: .black, design: .monospaced))
+                .foregroundStyle(SPDFVTheme.navigatorMuted)
+            ForEach(recipe.parameters) { parameter in
+                HStack {
+                    Text(parameter.name.uppercased())
+                        .font(.system(size: 8, weight: .bold, design: .monospaced))
+                        .foregroundStyle(SPDFVTheme.navigatorText)
+                    TextField(parameter.required ? "Required" : "Optional", text: parameterBinding(parameter.name))
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 10, design: .monospaced))
+                }
+            }
+            ForEach(recipe.requiredReferenceNames, id: \.self) { name in
+                sourceButton(
+                    title: "REFERENCE · \(name)",
+                    loaded: session.recipeReferences[name] != nil,
+                    action: { session.chooseRecipeReference(named: name) }
+                )
+            }
+            ForEach(recipe.requiredFormDataNames, id: \.self) { name in
+                sourceButton(
+                    title: "FORM DATA · \(name)",
+                    loaded: session.recipeFormDataSources[name] != nil,
+                    action: { session.chooseRecipeFormData(named: name) }
+                )
+            }
+        }
+        .padding(14)
+        .background(SPDFVTheme.navigatorInset)
+    }
+
+    private func parameterBinding(_ name: String) -> Binding<String> {
+        Binding(
+            get: { session.recipeParameterValues[name] ?? "" },
+            set: { session.setRecipeParameter(name, value: $0) }
+        )
+    }
+
+    private func sourceButton(title: String, loaded: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack {
+                Text(title)
+                Spacer()
+                Text(loaded ? "LOADED" : "CHOOSE…")
+            }
+            .font(.system(size: 8, weight: .bold, design: .monospaced))
+        }
+        .buttonStyle(RecipePanelButtonStyle(prominent: false))
     }
 
     private var verificationPlate: some View {

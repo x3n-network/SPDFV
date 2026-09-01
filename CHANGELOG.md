@@ -8,6 +8,7 @@
 - Added Batch Form Data Studio for CSV/TSV mail-merge-style generation with reusable column aliases, filename templates, and all-rows validation before output
 - Expanded privacy-conscious PDF Compare with intelligent inserted/removed-page alignment, configurable appearance tolerance and ignored regions, side-by-side/overlay/heatmap views, and JSON report export across Core, CLI, and the native workspace
 - Added backward-compatible Recipe v2 plates for page duplication, page deletion, OCR, and Safe Share assertions, with automatic schema upgrade in Recipe Press
+- Added Recipe v3 parameters, variable substitution, conditional branches, named form-data and comparison inputs, Doctor/Compare assertions, safe output naming templates, native run-input controls, and CLI context maps
 - Added a privacy-preserving Safe Share audit for metadata, review annotations, filled form fields, attachments, encryption, and signature fields across Core, CLI, and the native document inspector
 - Added a Document Safety Gate for encryption, permissions, and certificate-signature fields, with in-app password unlocking and machine-readable CLI output
 - Enforced PDF access permissions across page editing, annotations, forms, OCR, redaction, recipes, and CLI operations

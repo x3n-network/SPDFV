@@ -2,16 +2,26 @@ import Foundation
 
 
 public struct PDFRecipe: Codable, Equatable, Sendable {
-    public static let latestVersion = 2
+    public static let latestVersion = 3
 
     public let version: Int
     public let name: String
     public let steps: [PDFRecipeStep]
+    public let parameters: [PDFRecipeParameter]
+    public let outputNameTemplate: String?
 
-    public init(version: Int = 1, name: String, steps: [PDFRecipeStep]) {
+    public init(
+        version: Int = 1,
+        name: String,
+        steps: [PDFRecipeStep],
+        parameters: [PDFRecipeParameter] = [],
+        outputNameTemplate: String? = nil
+    ) {
         self.version = version
         self.name = name
         self.steps = steps
+        self.parameters = parameters
+        self.outputNameTemplate = outputNameTemplate
     }
 
     public static let starter = PDFRecipe(
@@ -23,6 +33,61 @@ public struct PDFRecipe: Codable, Equatable, Sendable {
             .extract(pages: "all")
         ]
     )
+}
+
+public struct PDFRecipeParameter: Codable, Equatable, Sendable, Identifiable {
+    public var id: String { name }
+    public let name: String
+    public let defaultValue: String?
+    public let required: Bool
+
+    public init(name: String, defaultValue: String? = nil, required: Bool = true) {
+        self.name = name
+        self.defaultValue = defaultValue
+        self.required = required
+    }
+
+    private enum CodingKeys: String, CodingKey { case name, defaultValue, required }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            name: try container.decode(String.self, forKey: .name),
+            defaultValue: try container.decodeIfPresent(String.self, forKey: .defaultValue),
+            required: try container.decodeIfPresent(Bool.self, forKey: .required) ?? true
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(name, forKey: .name)
+        try container.encodeIfPresent(defaultValue, forKey: .defaultValue)
+        if !required { try container.encode(false, forKey: .required) }
+    }
+}
+
+extension PDFRecipe {
+    private enum CodingKeys: String, CodingKey { case version, name, steps, parameters, outputNameTemplate }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            version: try container.decode(Int.self, forKey: .version),
+            name: try container.decode(String.self, forKey: .name),
+            steps: try container.decode([PDFRecipeStep].self, forKey: .steps),
+            parameters: try container.decodeIfPresent([PDFRecipeParameter].self, forKey: .parameters) ?? [],
+            outputNameTemplate: try container.decodeIfPresent(String.self, forKey: .outputNameTemplate)
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(version, forKey: .version)
+        try container.encode(name, forKey: .name)
+        try container.encode(steps, forKey: .steps)
+        if !parameters.isEmpty { try container.encode(parameters, forKey: .parameters) }
+        try container.encodeIfPresent(outputNameTemplate, forKey: .outputNameTemplate)
+    }
 }
 
 public enum PDFRecipeStep: Equatable, Sendable {
@@ -39,6 +104,10 @@ public enum PDFRecipeStep: Equatable, Sendable {
     case assertFields(names: [String])
     case assertFormGate(maximum: PDFFormGateLevel)
     case assertSafeShare(maximum: PDFSafetyGateLevel)
+    case importFormData(source: String)
+    case assertCompare(reference: String, maximumChangedPages: Int, options: PDFComparisonOptions)
+    case assertDoctor(maximum: PDFDoctorLevel)
+    case ifParameter(name: String, equals: String, steps: [PDFRecipeStep])
 
     public var operation: String {
         switch self {
@@ -55,6 +124,10 @@ public enum PDFRecipeStep: Equatable, Sendable {
         case .assertFields: "assertFields"
         case .assertFormGate: "assertFormGate"
         case .assertSafeShare: "assertSafeShare"
+        case .importFormData: "importFormData"
+        case .assertCompare: "assertCompare"
+        case .assertDoctor: "assertDoctor"
+        case .ifParameter: "ifParameter"
         }
     }
 
@@ -82,12 +155,19 @@ public enum PDFRecipeStep: Equatable, Sendable {
         case .assertFields(let names): "Require \(names.count) field\(names.count == 1 ? "" : "s")"
         case .assertFormGate(let maximum): "Require Form Gate \(maximum.rawValue) or better"
         case .assertSafeShare(let maximum): "Require Safe Share \(maximum.rawValue) or better"
+        case .importFormData(let source): "Import form data \(source)"
+        case .assertCompare(let reference, let maximum, _):
+            "Compare with \(reference); allow \(maximum) changed page\(maximum == 1 ? "" : "s")"
+        case .assertDoctor(let maximum): "Require Doctor \(maximum.rawValue) or better"
+        case .ifParameter(let name, let expected, let steps):
+            "If \(name) equals \(expected), run \(steps.count) step\(steps.count == 1 ? "" : "s")"
         }
     }
 
     public var minimumRecipeVersion: Int {
         switch self {
         case .duplicatePages, .deletePages, .ocr, .assertSafeShare: 2
+        case .importFormData, .assertCompare, .assertDoctor, .ifParameter: 3
         default: 1
         }
     }
@@ -108,6 +188,7 @@ extension PDFRecipeStep: Codable {
     private enum CodingKeys: String, CodingKey {
         case operation, from, to, values, pages, degrees, insets, configuration
         case minimum, maximum, contains, excludes, names
+        case source, reference, maximumChangedPages, options, name, equals, steps
     }
 
     public init(from decoder: Decoder) throws {
@@ -158,6 +239,22 @@ extension PDFRecipeStep: Codable {
             self = .assertFormGate(maximum: try container.decode(PDFFormGateLevel.self, forKey: .maximum))
         case "assertSafeShare":
             self = .assertSafeShare(maximum: try container.decode(PDFSafetyGateLevel.self, forKey: .maximum))
+        case "importFormData":
+            self = .importFormData(source: try container.decode(String.self, forKey: .source))
+        case "assertCompare":
+            self = .assertCompare(
+                reference: try container.decode(String.self, forKey: .reference),
+                maximumChangedPages: try container.decodeIfPresent(Int.self, forKey: .maximumChangedPages) ?? 0,
+                options: try container.decodeIfPresent(PDFComparisonOptions.self, forKey: .options) ?? PDFComparisonOptions()
+            )
+        case "assertDoctor":
+            self = .assertDoctor(maximum: try container.decode(PDFDoctorLevel.self, forKey: .maximum))
+        case "ifParameter":
+            self = .ifParameter(
+                name: try container.decode(String.self, forKey: .name),
+                equals: try container.decode(String.self, forKey: .equals),
+                steps: try container.decode([PDFRecipeStep].self, forKey: .steps)
+            )
         default:
             throw DecodingError.dataCorruptedError(
                 forKey: .operation,
@@ -201,6 +298,36 @@ extension PDFRecipeStep: Codable {
             try container.encode(maximum, forKey: .maximum)
         case .assertSafeShare(let maximum):
             try container.encode(maximum, forKey: .maximum)
+        case .importFormData(let source):
+            try container.encode(source, forKey: .source)
+        case .assertCompare(let reference, let maximum, let options):
+            try container.encode(reference, forKey: .reference)
+            try container.encode(maximum, forKey: .maximumChangedPages)
+            try container.encode(options, forKey: .options)
+        case .assertDoctor(let maximum):
+            try container.encode(maximum, forKey: .maximum)
+        case .ifParameter(let name, let expected, let steps):
+            try container.encode(name, forKey: .name)
+            try container.encode(expected, forKey: .equals)
+            try container.encode(steps, forKey: .steps)
         }
+    }
+}
+
+public extension PDFRecipe {
+    var requiredReferenceNames: [String] { Self.externalNames(in: steps, reference: true) }
+    var requiredFormDataNames: [String] { Self.externalNames(in: steps, reference: false) }
+
+    private static func externalNames(in steps: [PDFRecipeStep], reference: Bool) -> [String] {
+        var names: Set<String> = []
+        for step in steps {
+            switch step {
+            case .assertCompare(let name, _, _) where reference: names.insert(name)
+            case .importFormData(let name) where !reference: names.insert(name)
+            case .ifParameter(_, _, let nested): names.formUnion(externalNames(in: nested, reference: reference))
+            default: break
+            }
+        }
+        return names.sorted()
     }
 }

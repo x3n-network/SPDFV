@@ -26,6 +26,7 @@ CLI/.build/release/spdfv rename-field authored.pdf --from reviewer --to review.o
 CLI/.build/release/spdfv recipe-template > intake-recipe.json
 CLI/.build/release/spdfv validate-recipe intake.pdf --recipe intake-recipe.json --pretty
 CLI/.build/release/spdfv run-recipe intake.pdf --recipe intake-recipe.json --output prepared.pdf --pretty
+CLI/.build/release/spdfv run-recipe intake.pdf --recipe recipe-v3.json --output-dir ./processed --parameters '{"case":"A-104"}' --references '{"approved":"./approved.pdf"}' --form-data '{"values":"./values.json"}' --pretty
 CLI/.build/release/spdfv batch-recipe ./incoming --recipe intake-recipe.json --output-dir ./processed --pretty
 CLI/.build/release/spdfv library-add --library recipes.json --recipe intake-recipe.json --favorite --pretty
 CLI/.build/release/spdfv enqueue-recipe intake.pdf --recipe intake-recipe.json --output prepared.pdf --queue jobs.json --pretty
@@ -68,11 +69,34 @@ Batch Form Data accepts quote-aware UTF-8 CSV or TSV tables and generates one co
 
 ## Recipes
 
-Recipes are deterministic JSON workflows. Version 1 supports ordered `renameField`, `fillForm`, `rotate`, `crop`, and `extract` actions plus page-count, text, field, and Form Gate assertions. Version 2 remains backward-compatible and adds `duplicatePages`, `deletePages`, `ocr`, and `assertSafeShare`. Recipe Press upgrades a v1 composition only when a v2 plate is added.
+Recipes are deterministic JSON workflows. Version 1 supports ordered `renameField`, `fillForm`, `rotate`, `crop`, and `extract` actions plus page-count, text, field, and Form Gate assertions. Version 2 remains backward-compatible and adds `duplicatePages`, `deletePages`, `ocr`, and `assertSafeShare`. Version 3 adds declared string parameters, `importFormData`, `assertCompare`, `assertDoctor`, simple `ifParameter` branches, and output filename templates. Older recipe JSON decodes unchanged, and Recipe Press upgrades the version only when a newer plate or input feature is added.
 
 `recipe-template` prints a v1-compatible starter, `validate-recipe` executes the complete workflow in memory without writing a PDF, and `run-recipe` writes only after the output survives PDF round-trip verification and Form Gate validation. A recipe may contain at most 100 steps, and page specifications are evaluated against the document state at that step. OCR configuration uses the same recognition level, language codes, language-correction flag, and 72–400 DPI range as the standalone command.
 
 `batch-recipe` processes the direct PDF children of an input directory in deterministic filename order. Passing documents are written to the output directory; failed documents produce no PDF. A `spdfv-batch-manifest.json` records every result. The command exits nonzero if any item fails, even though passing outputs and the manifest are still written. Use `--dry-run` without an output directory to validate the entire folder without writing anything.
+
+Recipe v3 parameters are declared with `name`, optional `defaultValue`, and `required`. Strings may interpolate `{{name}}`, `{{inputName}}`, and `{{recipeName}}`. `--parameters` accepts a JSON string map; `--references` and `--form-data` accept JSON maps from recipe source names to local file paths. `run-recipe --output-dir` uses `outputNameTemplate`, sanitizes unsafe filename characters, and adds `.pdf` when needed. Conditional nesting is limited to five levels and every recipe is limited to 100 total steps, including nested steps. Reports mark skipped conditions without exposing parameter values.
+
+Queued and watched recipes run without an external execution context. They therefore support v3 recipes whose required parameters have defaults and which do not require named reference or form-data files; use direct app or CLI runs for recipes with external inputs.
+
+```json
+{
+  "version": 3,
+  "name": "Approved intake",
+  "parameters": [
+    {"name": "case", "required": true},
+    {"name": "mode", "defaultValue": "production", "required": true}
+  ],
+  "outputNameTemplate": "{{inputName}}-{{case}}.pdf",
+  "steps": [
+    {"operation": "importFormData", "source": "values"},
+    {"operation": "ifParameter", "name": "mode", "equals": "production", "steps": [
+      {"operation": "assertDoctor", "maximum": "attention"}
+    ]},
+    {"operation": "assertCompare", "reference": "approved", "maximumChangedPages": 1}
+  ]
+}
+```
 
 ## Queue files
 

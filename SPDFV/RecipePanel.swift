@@ -15,6 +15,7 @@ struct RecipePanel: View {
     @State private var libraryFilter = RecipeLibraryFilter.all
     @State private var selectedLibraryEntryID: UUID?
     @State private var pendingLibraryDelete: PDFRecipeLibraryEntry?
+    @State private var isConfiguringRecipe = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -56,6 +57,11 @@ struct RecipePanel: View {
             Button("Cancel", role: .cancel) { pendingLibraryDelete = nil }
         } message: {
             Text("The personal recipe and its revision history will be removed. Export JSON first if you need a recoverable copy.")
+        }
+        .sheet(isPresented: $isConfiguringRecipe) {
+            if let recipe = session.loadedRecipe {
+                RecipeV3ConfigurationView(session: session, recipe: recipe, isPresented: $isConfiguringRecipe)
+            }
         }
     }
 
@@ -174,6 +180,7 @@ struct RecipePanel: View {
                 }
                 Spacer()
                 if isComposing {
+                    recipeUtilityButton("INPUTS", icon: .controls) { isConfiguringRecipe = true }
                     recipeUtilityButton("KEEP", icon: .archive) { session.saveLoadedRecipeToLibrary() }
                         .disabled(!canPersist(recipe))
                     recipeUtilityButton("FILE", icon: .save) { session.saveLoadedRecipe() }
@@ -535,4 +542,78 @@ struct RecipePanel: View {
         stepDraftError == nil && recipeValidationError(recipe) == nil
     }
 
+}
+
+private struct RecipeV3ConfigurationView: View {
+    @ObservedObject var session: DocumentSession
+    let recipe: PDFRecipe
+    @Binding var isPresented: Bool
+    @State private var parametersText: String
+    @State private var outputTemplate: String
+    @State private var validationError: String?
+
+    init(session: DocumentSession, recipe: PDFRecipe, isPresented: Binding<Bool>) {
+        self.session = session
+        self.recipe = recipe
+        _isPresented = isPresented
+        _parametersText = State(initialValue: recipe.parameters.map { parameter in
+            parameter.defaultValue.map { "\(parameter.name)=\($0)" } ?? parameter.name
+        }.joined(separator: "\n"))
+        _outputTemplate = State(initialValue: recipe.outputNameTemplate ?? "")
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("RECIPE V3 INPUTS")
+                .font(.system(size: 10, weight: .black, design: .monospaced))
+            Text("Declare one parameter per line. Use name=value for a default; a bare name is required.")
+                .font(.system(size: 10))
+                .foregroundStyle(SPDFVTheme.navigatorMuted)
+            TextEditor(text: $parametersText)
+                .font(.system(size: 11, design: .monospaced))
+                .frame(height: 120)
+                .overlay { Rectangle().stroke(SPDFVTheme.divider) }
+            Text("OUTPUT NAME TEMPLATE")
+                .font(.system(size: 8, weight: .black, design: .monospaced))
+            TextField("{{inputName}}-processed.pdf", text: $outputTemplate)
+                .textFieldStyle(.roundedBorder)
+                .font(.system(size: 11, design: .monospaced))
+            Text("Use {{parameter}}, {{inputName}}, or {{recipeName}}. The .pdf extension is added automatically.")
+                .font(.system(size: 9))
+                .foregroundStyle(SPDFVTheme.navigatorMuted)
+            if let validationError {
+                Text(validationError).font(.system(size: 9)).foregroundStyle(Color.orange)
+            }
+            HStack {
+                Spacer()
+                Button("CANCEL") { isPresented = false }
+                Button("SAVE INPUTS") { save() }
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 460)
+        .background(SPDFVTheme.navigator)
+        .foregroundStyle(SPDFVTheme.navigatorText)
+    }
+
+    private func save() {
+        do {
+            var names: Set<String> = []
+            var parameters: [PDFRecipeParameter] = []
+            for rawLine in parametersText.split(whereSeparator: \.isNewline) {
+                let line = String(rawLine).trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !line.isEmpty else { continue }
+                let parts = line.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
+                let name = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !name.isEmpty else { throw PDFOperationError.invalidInput("Parameter names cannot be empty") }
+                guard names.insert(name).inserted else { throw PDFOperationError.invalidInput("Duplicate parameter: \(name)") }
+                parameters.append(PDFRecipeParameter(name: name, defaultValue: parts.count == 2 ? parts[1] : nil))
+            }
+            session.updateRecipeConfiguration(parameters: parameters, outputNameTemplate: outputTemplate)
+            isPresented = false
+        } catch {
+            validationError = (error as? PDFOperationError)?.description ?? error.localizedDescription
+        }
+    }
 }

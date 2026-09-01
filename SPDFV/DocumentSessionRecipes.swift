@@ -15,6 +15,7 @@ func importRecipeFromPicker() {
 
     do {
         loadedRecipe = try PDFRecipeRunner.decode(Data(contentsOf: url))
+        configureRecipeInputs(for: loadedRecipe)
         loadedRecipeName = url.lastPathComponent
         activeLibraryRecipeID = nil
         recipeReport = nil
@@ -28,6 +29,7 @@ func importRecipeFromPicker() {
 
 func loadStarterRecipe() {
     loadedRecipe = .starter
+    configureRecipeInputs(for: loadedRecipe)
     loadedRecipeName = "starter-recipe.json"
     activeLibraryRecipeID = nil
     recipeReport = nil
@@ -38,19 +40,44 @@ func loadStarterRecipe() {
 
 func renameLoadedRecipe(_ name: String) {
     guard let recipe = loadedRecipe, recipe.name != name else { return }
-    loadedRecipe = PDFRecipe(version: recipe.version, name: name, steps: recipe.steps)
+    loadedRecipe = PDFRecipe(version: recipe.version, name: name, steps: recipe.steps, parameters: recipe.parameters, outputNameTemplate: recipe.outputNameTemplate)
+    markRecipeEdited()
+}
+
+func updateRecipeConfiguration(parameters: [PDFRecipeParameter], outputNameTemplate: String?) {
+    guard let recipe = loadedRecipe else { return }
+    let template = outputNameTemplate?.trimmingCharacters(in: .whitespacesAndNewlines)
+    loadedRecipe = PDFRecipe(
+        version: parameters.isEmpty && template == nil ? recipe.version : max(recipe.version, 3),
+        name: recipe.name,
+        steps: recipe.steps,
+        parameters: parameters,
+        outputNameTemplate: template?.isEmpty == true ? nil : template
+    )
+    let prior = recipeParameterValues
+    recipeParameterValues = Dictionary(uniqueKeysWithValues: parameters.map {
+        ($0.name, prior[$0.name] ?? $0.defaultValue ?? "")
+    })
     markRecipeEdited()
 }
 
 func addRecipeStep(_ step: PDFRecipeStep, after index: Int? = nil) {
     guard let recipe = loadedRecipe else { return }
     var steps = recipe.steps
+    var parameters = recipe.parameters
+    if case .ifParameter(let name, _, _) = step,
+       !parameters.contains(where: { $0.name == name }) {
+        parameters.append(PDFRecipeParameter(name: name))
+        recipeParameterValues[name] = ""
+    }
     let insertionIndex = min(max(0, (index ?? (steps.count - 1)) + 1), steps.count)
     steps.insert(step, at: insertionIndex)
     loadedRecipe = PDFRecipe(
         version: max(recipe.version, step.minimumRecipeVersion),
         name: recipe.name,
-        steps: steps
+        steps: steps,
+        parameters: parameters,
+        outputNameTemplate: recipe.outputNameTemplate
     )
     markRecipeEdited()
 }
@@ -62,7 +89,9 @@ func updateRecipeStep(at index: Int, to step: PDFRecipeStep) {
     loadedRecipe = PDFRecipe(
         version: max(recipe.version, step.minimumRecipeVersion),
         name: recipe.name,
-        steps: steps
+        steps: steps,
+        parameters: recipe.parameters,
+        outputNameTemplate: recipe.outputNameTemplate
     )
     markRecipeEdited()
 }
@@ -71,7 +100,7 @@ func removeRecipeStep(at index: Int) {
     guard let recipe = loadedRecipe, recipe.steps.indices.contains(index) else { return }
     var steps = recipe.steps
     steps.remove(at: index)
-    loadedRecipe = PDFRecipe(version: recipe.version, name: recipe.name, steps: steps)
+    loadedRecipe = PDFRecipe(version: recipe.version, name: recipe.name, steps: steps, parameters: recipe.parameters, outputNameTemplate: recipe.outputNameTemplate)
     markRecipeEdited()
 }
 
@@ -84,7 +113,7 @@ func moveRecipeStep(from source: Int, to destination: Int) {
     var steps = recipe.steps
     let moved = steps.remove(at: source)
     steps.insert(moved, at: destination)
-    loadedRecipe = PDFRecipe(version: recipe.version, name: recipe.name, steps: steps)
+    loadedRecipe = PDFRecipe(version: recipe.version, name: recipe.name, steps: steps, parameters: recipe.parameters, outputNameTemplate: recipe.outputNameTemplate)
     markRecipeEdited()
 }
 
@@ -136,6 +165,7 @@ func shareLoadedRecipe() {
 func loadLibraryRecipe(_ entryID: UUID) {
     guard let entry = RecipeLibraryStore.shared.entry(entryID) else { return }
     loadedRecipe = entry.recipe
+    configureRecipeInputs(for: loadedRecipe)
     activeLibraryRecipeID = entry.id
     loadedRecipeName = "\(entry.kind == .preset ? "PRESET" : "CABINET") · R\(entry.revision)"
     clearRecipeProof()
@@ -226,6 +256,79 @@ private func clearRecipeProof() {
     lastBatchOutputDirectory = nil
 }
 
+private func configureRecipeInputs(for recipe: PDFRecipe?) {
+    recipeReferences = [:]
+    recipeFormDataSources = [:]
+    recipeParameterValues = Dictionary(uniqueKeysWithValues: (recipe?.parameters ?? []).map {
+        ($0.name, $0.defaultValue ?? "")
+    })
+}
+
+private func recipeExecutionContext(inputName: String?) -> PDFRecipeExecutionContext {
+    PDFRecipeExecutionContext(
+        parameters: recipeParameterValues,
+        references: recipeReferences,
+        formData: recipeFormDataSources,
+        inputName: inputName
+    )
+}
+
+func setRecipeParameter(_ name: String, value: String) {
+    recipeParameterValues[name] = value
+    if let recipe = loadedRecipe {
+        for source in recipe.requiredReferenceNames {
+            if let data = recipeReferences[source] { recipeReferences[resolvedRecipeInputKey(source)] = data }
+        }
+        for source in recipe.requiredFormDataNames {
+            if let data = recipeFormDataSources[source] { recipeFormDataSources[resolvedRecipeInputKey(source)] = data }
+        }
+    }
+    clearRecipeProof()
+}
+
+func chooseRecipeReference(named name: String) {
+    let panel = NSOpenPanel()
+    panel.allowedContentTypes = [.pdf]
+    panel.allowsMultipleSelection = false
+    panel.message = "Choose the PDF reference named \(name)"
+    guard panel.runModal() == .OK, let url = panel.url else { return }
+    do {
+        let data = try Data(contentsOf: url)
+        recipeReferences[name] = data
+        recipeReferences[resolvedRecipeInputKey(name)] = data
+        clearRecipeProof()
+    } catch {
+        errorMessage = "The recipe reference could not be loaded: \(Self.message(for: error))"
+    }
+}
+
+func chooseRecipeFormData(named name: String) {
+    let panel = NSOpenPanel()
+    panel.allowedContentTypes = [.json]
+    panel.allowsMultipleSelection = false
+    panel.message = "Choose the form-data JSON named \(name)"
+    guard panel.runModal() == .OK, let url = panel.url else { return }
+    do {
+        let data = try PDFOperations.decodeFormData(Data(contentsOf: url))
+        recipeFormDataSources[name] = data
+        recipeFormDataSources[resolvedRecipeInputKey(name)] = data
+        clearRecipeProof()
+    } catch {
+        errorMessage = "The recipe form data could not be loaded: \(Self.message(for: error))"
+    }
+}
+
+private func resolvedRecipeInputKey(_ source: String) -> String {
+    var result = source
+    for (name, value) in recipeParameterValues {
+        result = result.replacingOccurrences(of: "{{\(name)}}", with: value)
+    }
+    if let recipe = loadedRecipe {
+        result = result.replacingOccurrences(of: "{{recipeName}}", with: recipe.name)
+    }
+    return result
+}
+
 private static func recipeFilename(_ name: String) -> String {
     let slug = name.lowercased()
         .components(separatedBy: CharacterSet.alphanumerics.inverted)
@@ -245,7 +348,12 @@ func validateLoadedRecipe() {
         documentName: displayName
     )
     do {
-        recipeReport = try PDFRecipeRunner.run(loadedRecipe, on: data, dryRun: true).report
+        recipeReport = try PDFRecipeRunner.run(
+            loadedRecipe,
+            on: data,
+            dryRun: true,
+            context: recipeExecutionContext(inputName: displayName)
+        ).report
         lastRecipeOutputURL = nil
         batchRecipeReport = nil
         lastBatchOutputDirectory = nil
@@ -265,7 +373,15 @@ func exportLoadedRecipe() {
     let panel = NSSavePanel()
     panel.allowedContentTypes = [.pdf]
     panel.canCreateDirectories = true
-    panel.nameFieldStringValue = "\(displayName)-processed.pdf"
+    do {
+        panel.nameFieldStringValue = try PDFRecipeRunner.suggestedOutputName(
+            for: loadedRecipe,
+            context: recipeExecutionContext(inputName: displayName)
+        ) ?? "\(displayName)-processed.pdf"
+    } catch {
+        errorMessage = "Recipe export inputs are incomplete: \(Self.message(for: error))"
+        return
+    }
     panel.message = "Export the verified recipe result as a new PDF"
     guard panel.runModal() == .OK, let url = panel.url else { return }
 
@@ -278,7 +394,11 @@ func exportLoadedRecipe() {
         documentName: displayName
     )
     do {
-        let result = try PDFRecipeRunner.run(loadedRecipe, on: data)
+        let result = try PDFRecipeRunner.run(
+            loadedRecipe,
+            on: data,
+            context: recipeExecutionContext(inputName: displayName)
+        )
         try result.data.write(to: url, options: .atomic)
         guard let reopened = PDFDocument(url: url), reopened.pageCount == result.report.outputPageCount else {
             throw PDFOperationError.operationFailed("Exported recipe output failed final verification")
@@ -354,7 +474,11 @@ func processRecipeFolder() {
         let inputs = try urls.map {
             PDFRecipeBatchInput(name: $0.lastPathComponent, data: try Data(contentsOf: $0))
         }
-        let result = PDFRecipeBatchRunner.run(loadedRecipe, inputs: inputs)
+        let result = PDFRecipeBatchRunner.run(
+            loadedRecipe,
+            inputs: inputs,
+            context: recipeExecutionContext(inputName: nil)
+        )
         let manifestURL = outputDirectory.appendingPathComponent("spdfv-batch-manifest.json")
         let destinations = result.outputs.map { outputDirectory.appendingPathComponent($0.name) } + [manifestURL]
         if let collision = destinations.first(where: { FileManager.default.fileExists(atPath: $0.path) }) {

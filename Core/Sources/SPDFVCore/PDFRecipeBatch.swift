@@ -47,15 +47,27 @@ public enum PDFRecipeBatchRunner {
     public static func run(
         _ recipe: PDFRecipe,
         inputs: [PDFRecipeBatchInput],
-        dryRun: Bool = false
+        dryRun: Bool = false,
+        context: PDFRecipeExecutionContext = PDFRecipeExecutionContext()
     ) -> PDFRecipeBatchRunResult {
         var items: [PDFRecipeBatchItemReport] = []
         var outputs: [PDFRecipeBatchOutput] = []
+        var outputNames: Set<String> = []
         for input in inputs {
             do {
-                let result = try PDFRecipeRunner.run(recipe, on: input.data, dryRun: dryRun)
+                let itemContext = PDFRecipeExecutionContext(
+                    parameters: context.parameters,
+                    references: context.references,
+                    formData: context.formData,
+                    inputName: input.name
+                )
+                let result = try PDFRecipeRunner.run(recipe, on: input.data, dryRun: dryRun, context: itemContext)
+                let outputName = result.report.suggestedOutputName ?? input.name
+                guard outputNames.insert(outputName.lowercased()).inserted else {
+                    throw PDFOperationError.invalidInput("Output naming template produced a duplicate filename: \(outputName)")
+                }
                 items.append(PDFRecipeBatchItemReport(name: input.name, status: .passed, error: nil, report: result.report))
-                if !dryRun { outputs.append(PDFRecipeBatchOutput(name: input.name, data: result.data)) }
+                if !dryRun { outputs.append(PDFRecipeBatchOutput(name: outputName, data: result.data)) }
             } catch {
                 let message = (error as? PDFOperationError)?.description ?? error.localizedDescription
                 items.append(PDFRecipeBatchItemReport(name: input.name, status: .failed, error: message, report: nil))

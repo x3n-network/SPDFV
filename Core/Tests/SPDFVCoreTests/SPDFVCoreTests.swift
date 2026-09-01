@@ -712,13 +712,61 @@ final class SPDFVCoreTests: XCTestCase {
         let unknown = #"{"version":1,"name":"Bad","steps":[{"operation":"flatten"}]}"#
         XCTAssertThrowsError(try PDFRecipeRunner.decode(try XCTUnwrap(unknown.data(using: .utf8))))
 
-        let future = PDFRecipe(version: 3, name: "Future", steps: [.extract(pages: "all")])
+        let future = PDFRecipe(version: 4, name: "Future", steps: [.extract(pages: "all")])
         XCTAssertThrowsError(try PDFRecipeRunner.run(future, on: try XCTUnwrap(makeDocument(pageNumbers: [1]).dataRepresentation())))
 
         let mismatched = PDFRecipe(version: 1, name: "Old schema", steps: [.duplicatePages(pages: "1")])
         XCTAssertThrowsError(try PDFRecipeRunner.validate(mismatched)) { error in
             XCTAssertTrue(String(describing: error).contains("requires recipe version 2"))
         }
+    }
+
+    func testRecipeV3ResolvesInputsConditionsAssertionsAndOutputNames() throws {
+        let document = makeDocument(pageNumbers: [1])
+        try PDFOperations.addFormField(
+            PDFFormFieldDraft(name: "review.owner", kind: .text),
+            to: document,
+            pageIndex: 0,
+            bounds: CGRect(x: 72, y: 650, width: 220, height: 32)
+        )
+        let sourceData = try XCTUnwrap(document.dataRepresentation())
+        let recipe = PDFRecipe(
+            version: 3,
+            name: "Parameterized intake",
+            steps: [
+                .importFormData(source: "intake"),
+                .ifParameter(name: "mode", equals: "production", steps: [
+                    .fillForm(values: ["review.owner": "{{owner}}"])
+                ]),
+                .ifParameter(name: "mode", equals: "draft", steps: [
+                    .rotate(pages: "all", degrees: 90)
+                ]),
+                .assertCompare(reference: "baseline", maximumChangedPages: 1, options: PDFComparisonOptions()),
+                .assertDoctor(maximum: .critical)
+            ],
+            parameters: [
+                PDFRecipeParameter(name: "mode"),
+                PDFRecipeParameter(name: "owner", defaultValue: "Fallback")
+            ],
+            outputNameTemplate: "{{inputName}}-{{owner}}/{{mode}}"
+        )
+        let result = try PDFRecipeRunner.run(
+            recipe,
+            on: sourceData,
+            context: PDFRecipeExecutionContext(
+                parameters: ["mode": "production", "owner": "Ada"],
+                references: ["baseline": sourceData],
+                formData: ["intake": PDFFormDataFile(fields: [PDFFormDataEntry(name: "review.owner", value: "Grace")])],
+                inputName: "intake.pdf"
+            )
+        )
+        let reopened = try XCTUnwrap(PDFDocument(data: result.data))
+
+        XCTAssertEqual(PDFOperations.formReport(for: reopened).fields.first?.value, "Ada")
+        XCTAssertEqual(result.report.steps.map(\.skipped), [false, false, true, false, false])
+        XCTAssertEqual(result.report.suggestedOutputName, "intake-Ada-production.pdf")
+        XCTAssertEqual(try PDFRecipeRunner.decode(PDFRecipeRunner.encode(recipe)), recipe)
+        XCTAssertThrowsError(try PDFRecipeRunner.run(recipe, on: sourceData))
     }
 
     func testRecipeV2ComposesPageOperationsOCRAndSafeShareGate() throws {

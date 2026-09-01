@@ -328,9 +328,9 @@ USAGE
   spdfv add-field <input.pdf> --page <n> --type <text|checkbox|choice> --name <field> --bounds <x,y,w,h> [--value <text>] [--choices <a,b,c>] --output <output.pdf> [--force] [--pretty]
   spdfv rename-field <input.pdf> --from <field> --to <field> --output <output.pdf> [--force] [--pretty]
   spdfv recipe-template
-  spdfv validate-recipe <input.pdf> --recipe <recipe.json> [--pretty]
-  spdfv run-recipe <input.pdf> --recipe <recipe.json> --output <output.pdf> [--force] [--pretty]
-  spdfv batch-recipe <input-directory> --recipe <recipe.json> [--output-dir <directory>] [--dry-run] [--force] [--pretty]
+  spdfv validate-recipe <input.pdf> --recipe <recipe.json> [--parameters <json>] [--references <json>] [--form-data <json>] [--pretty]
+  spdfv run-recipe <input.pdf> --recipe <recipe.json> (--output <output.pdf> | --output-dir <directory>) [--parameters <json>] [--references <json>] [--form-data <json>] [--force] [--pretty]
+  spdfv batch-recipe <input-directory> --recipe <recipe.json> [--output-dir <directory>] [--parameters <json>] [--references <json>] [--form-data <json>] [--dry-run] [--force] [--pretty]
   spdfv library-list --library <catalog.json> [--pretty]
   spdfv library-add --library <catalog.json> --recipe <recipe.json> [--favorite] [--pretty]
   spdfv library-export --library <catalog.json> --id <uuid> --output <recipe.json> [--force] [--pretty]

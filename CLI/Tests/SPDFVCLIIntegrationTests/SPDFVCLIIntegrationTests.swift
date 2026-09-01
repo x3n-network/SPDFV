@@ -327,6 +327,54 @@ final class SPDFVCLIIntegrationTests: XCTestCase {
         }
     }
 
+    func testRecipeV3AcceptsContextAndUsesOutputTemplate() throws {
+        try withFixtureDirectory { directory in
+            let input = directory.appendingPathComponent("input.pdf")
+            let authored = directory.appendingPathComponent("authored.pdf")
+            let recipeURL = directory.appendingPathComponent("recipe-v3.json")
+            let formDataURL = directory.appendingPathComponent("values.json")
+            try makeCompatibilityFixture().write(to: input)
+            let author = try runCLI([
+                "add-field", input.path, "--page", "1", "--type", "text",
+                "--name", "review.owner", "--bounds", "72,520,220,32", "--output", authored.path
+            ])
+            XCTAssertEqual(author.status, 0, author.stderr)
+            try Data(#"{"version":1,"fields":[{"name":"review.owner","value":"Grace"}]}"#.utf8).write(to: formDataURL)
+
+            let recipe = PDFRecipe(
+                version: 3,
+                name: "CLI v3",
+                steps: [
+                    .importFormData(source: "intake"),
+                    .ifParameter(name: "mode", equals: "production", steps: [
+                        .fillForm(values: ["review.owner": "{{owner}}"])
+                    ]),
+                    .assertCompare(reference: "baseline", maximumChangedPages: 1, options: PDFComparisonOptions()),
+                    .assertDoctor(maximum: .critical)
+                ],
+                parameters: [PDFRecipeParameter(name: "mode"), PDFRecipeParameter(name: "owner")],
+                outputNameTemplate: "{{inputName}}-{{owner}}.pdf"
+            )
+            try PDFRecipeRunner.encode(recipe).write(to: recipeURL)
+
+            let result = try runCLI([
+                "run-recipe", authored.path, "--recipe", recipeURL.path, "--output-dir", directory.path,
+                "--parameters", #"{"mode":"production","owner":"Ada"}"#,
+                "--references", #"{"baseline":"\#(authored.path)"}"#,
+                "--form-data", #"{"intake":"\#(formDataURL.path)"}"#,
+                "--pretty"
+            ])
+
+            XCTAssertEqual(result.status, 0, result.stderr)
+            let output = directory.appendingPathComponent("authored-Ada.pdf")
+            XCTAssertTrue(FileManager.default.fileExists(atPath: output.path))
+            let reopened = try XCTUnwrap(PDFDocument(url: output))
+            XCTAssertEqual(PDFOperations.formReport(for: reopened).fields.first { $0.name == "review.owner" }?.value, "Ada")
+            let report = try XCTUnwrap(try jsonObject(result.stdout)["report"] as? [String: Any])
+            XCTAssertEqual(report["suggestedOutputName"] as? String, "authored-Ada.pdf")
+        }
+    }
+
     func testCompareEmitsPageByPageMachineReadableReport() throws {
         try withFixtureDirectory { directory in
             let referenceURL = directory.appendingPathComponent("reference.pdf")

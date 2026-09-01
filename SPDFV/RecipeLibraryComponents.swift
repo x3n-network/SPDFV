@@ -175,8 +175,8 @@ struct RecipeStepDropDelegate: DropDelegate {
 }
 
 enum RecipeOperationKind: String, CaseIterable, Identifiable {
-    case assertPageCount, assertText, assertFields, assertFormGate, assertSafeShare
-    case renameField, fillForm, rotate, crop, extract, duplicatePages, deletePages, ocr
+    case assertPageCount, assertText, assertFields, assertFormGate, assertSafeShare, assertCompare, assertDoctor
+    case renameField, fillForm, importFormData, rotate, crop, extract, duplicatePages, deletePages, ocr, ifParameter
 
     var id: Self { self }
     var isAssertion: Bool { rawValue.hasPrefix("assert") }
@@ -188,14 +188,18 @@ enum RecipeOperationKind: String, CaseIterable, Identifiable {
         case .assertFields: "FIELD CHECK"
         case .assertFormGate: "FORM GATE"
         case .assertSafeShare: "SAFE SHARE"
+        case .assertCompare: "COMPARE"
+        case .assertDoctor: "DOCTOR"
         case .renameField: "RENAME FIELD"
         case .fillForm: "FILL FORM"
+        case .importFormData: "IMPORT FORM DATA"
         case .rotate: "ROTATE"
         case .crop: "CROP"
         case .extract: "EXTRACT"
         case .duplicatePages: "DUPLICATE"
         case .deletePages: "DELETE"
         case .ocr: "OCR"
+        case .ifParameter: "CONDITIONAL"
         }
     }
 
@@ -206,14 +210,18 @@ enum RecipeOperationKind: String, CaseIterable, Identifiable {
         case .assertFields: .list
         case .assertFormGate: .check
         case .assertSafeShare: .secureCopy
+        case .assertCompare: .copy
+        case .assertDoctor: .warning
         case .renameField: .textCursor
         case .fillForm: .editField
+        case .importFormData: .documentAdd
         case .rotate: .rotateRight
         case .crop: .crop
         case .extract: .extract
         case .duplicatePages: .duplicate
         case .deletePages: .delete
         case .ocr: .scanText
+        case .ifParameter: .route
         }
     }
 
@@ -224,14 +232,18 @@ enum RecipeOperationKind: String, CaseIterable, Identifiable {
         case .assertFields: .assertFields(names: ["field.name"])
         case .assertFormGate: .assertFormGate(maximum: .pass)
         case .assertSafeShare: .assertSafeShare(maximum: .warning)
+        case .assertCompare: .assertCompare(reference: "baseline", maximumChangedPages: 0, options: PDFComparisonOptions())
+        case .assertDoctor: .assertDoctor(maximum: .attention)
         case .renameField: .renameField(from: "old.name", to: "new.name")
         case .fillForm: .fillForm(values: ["field.name": "Value"])
+        case .importFormData: .importFormData(source: "values")
         case .rotate: .rotate(pages: "all", degrees: 90)
         case .crop: .crop(pages: "all", insets: .zero)
         case .extract: .extract(pages: "all")
         case .duplicatePages: .duplicatePages(pages: "1")
         case .deletePages: .deletePages(pages: "1")
         case .ocr: .ocr(pages: "all", configuration: PDFOCRConfiguration())
+        case .ifParameter: .ifParameter(name: "mode", equals: "production", steps: [.assertPageCount(minimum: 1, maximum: nil)])
         }
     }
 }

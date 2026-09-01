@@ -42,6 +42,14 @@ private struct RecipeStepDraft: Equatable {
             gate = maximum.rawValue
         case .assertSafeShare(let maximum):
             gate = maximum.rawValue
+        case .importFormData(let source):
+            primary = source
+        case .assertCompare(let reference, let maximum, let options):
+            primary = reference; secondary = String(maximum); tertiary = Self.number(options.minimumAppearanceSimilarity)
+        case .assertDoctor(let maximum):
+            gate = maximum.rawValue
+        case .ifParameter(let name, let expected, _):
+            primary = name; secondary = expected
         }
     }
 
@@ -108,6 +116,27 @@ private struct RecipeStepDraft: Equatable {
         case .assertSafeShare:
             guard let level = PDFSafetyGateLevel(rawValue: gate) else { return nil }
             return .assertSafeShare(maximum: level)
+        case .importFormData:
+            guard !trim(primary).isEmpty else { return nil }
+            return .importFormData(source: trim(primary))
+        case .assertCompare(_, _, let options):
+            guard !trim(primary).isEmpty, let maximum = Int(secondary), maximum >= 0,
+                  let similarity = Double(tertiary), (0...1).contains(similarity) else { return nil }
+            return .assertCompare(
+                reference: trim(primary),
+                maximumChangedPages: maximum,
+                options: PDFComparisonOptions(
+                    alignment: options.alignment,
+                    minimumAppearanceSimilarity: similarity,
+                    ignoredRegions: options.ignoredRegions
+                )
+            )
+        case .assertDoctor:
+            guard let level = PDFDoctorLevel(rawValue: gate) else { return nil }
+            return .assertDoctor(maximum: level)
+        case .ifParameter(_, _, let steps):
+            guard !trim(primary).isEmpty, !steps.isEmpty else { return nil }
+            return .ifParameter(name: trim(primary), equals: secondary, steps: steps)
         }
     }
 
@@ -127,6 +156,10 @@ private struct RecipeStepDraft: Equatable {
         case .assertFields: "Enter at least one field name"
         case .assertFormGate: "Choose the highest allowed gate level"
         case .assertSafeShare: "Choose the highest allowed audit level"
+        case .importFormData: "Enter a named form-data source"
+        case .assertCompare: "Enter a reference, changed-page limit, and 0–1 similarity"
+        case .assertDoctor: "Choose the highest allowed Doctor level"
+        case .ifParameter: "Enter a parameter name; nested steps remain intact"
         }
     }
 
@@ -324,6 +357,40 @@ struct RecipeStepEditor: View {
                 .labelsHidden()
                 .pickerStyle(.segmented)
             }
+        case .importFormData:
+            RecipeField(label: "SOURCE NAME", hint: "Matched to run input") {
+                recipeTextField("approved-values", text: $draft.primary)
+            }
+        case .assertCompare:
+            RecipeField(label: "REFERENCE NAME", hint: "Matched to run input") {
+                recipeTextField("baseline", text: $draft.primary)
+            }
+            HStack(spacing: 9) {
+                RecipeField(label: "MAX CHANGED PAGES", hint: "Zero requires identity") {
+                    recipeTextField("0", text: $draft.secondary)
+                }
+                RecipeField(label: "SIMILARITY", hint: "0 through 1") {
+                    recipeTextField("0.999", text: $draft.tertiary)
+                }
+            }
+        case .assertDoctor:
+            RecipeField(label: "HIGHEST ALLOWED LEVEL", hint: "The run stops above this level") {
+                Picker("", selection: $draft.gate) {
+                    ForEach([PDFDoctorLevel.healthy, .attention, .critical], id: \.rawValue) {
+                        Text($0.rawValue.uppercased()).tag($0.rawValue)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+            }
+        case .ifParameter:
+            RecipeField(label: "PARAMETER", hint: "Declared Recipe v3 parameter") {
+                recipeTextField("mode", text: $draft.primary)
+            }
+            RecipeField(label: "EQUALS", hint: "Exact value; variables allowed") {
+                recipeTextField("production", text: $draft.secondary)
+            }
+            RecipeNote("Nested steps are preserved. Edit advanced conditional contents in recipe JSON.")
         }
     }
 

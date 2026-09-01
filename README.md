@@ -23,7 +23,7 @@ The interface is deliberately compact. It is not a web view in a desktop shell, 
 - Run Document Doctor for a prioritized health report, preview copy-safe OCR/form/metadata repairs, and verify a repaired copy against the original diagnosis
 - Add an on-device searchable text layer to scanned pages with Vision OCR
 - Create permanent rasterized redactions and verify forbidden text is absent
-- Build, preview, and reuse versioned JSON recipes with page editing, forms, OCR, Safe Share assertions, and deterministic validation
+- Build, preview, and reuse versioned JSON recipes with parameters, conditional steps, form-data inputs, Compare and Doctor assertions, output naming, page editing, OCR, and deterministic validation
 - Run recipe queues in the app, in the background, or through `spdfv`
 - Use light, dark, or system appearance
 - Print through the native macOS print panel
