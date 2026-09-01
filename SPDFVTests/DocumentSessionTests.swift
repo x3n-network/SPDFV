@@ -1,5 +1,6 @@
 import AppKit
 import PDFKit
+import SPDFVCore
 import XCTest
 @testable import SPDFV
 
@@ -97,6 +98,18 @@ final class DocumentSessionTests: XCTestCase {
 
         session.removeRecipeStep(at: 4)
         XCTAssertEqual(session.loadedRecipe?.steps.count, 4)
+    }
+
+    func testAddingRecipeV2PlateUpgradesCompositionWithoutChangingV1Starter() {
+        let session = DocumentSession()
+        session.loadStarterRecipe()
+        XCTAssertEqual(session.loadedRecipe?.version, 1)
+
+        session.addRecipeStep(.duplicatePages(pages: "1"), after: 0)
+
+        XCTAssertEqual(session.loadedRecipe?.version, 2)
+        XCTAssertEqual(session.loadedRecipe?.steps[1].operation, "duplicatePages")
+        XCTAssertNoThrow(try PDFRecipeRunner.validate(XCTUnwrap(session.loadedRecipe)))
     }
 
     func testAnnotationTransactionUndoAndRedoMaintainInventory() throws {

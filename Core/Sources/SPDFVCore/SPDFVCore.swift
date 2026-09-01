@@ -284,6 +284,31 @@ public enum PDFOperations {
     }
 
     @discardableResult
+    public static func duplicatePages(_ document: PDFDocument, pageIndices: [Int]) throws -> Int {
+        try requirePermission(.contentCopying, for: document)
+        try requirePermission(.pageAssembly, for: document)
+        let indices = try PDFPageSelection.validate(pageIndices, pageCount: document.pageCount)
+        for index in indices.reversed() {
+            guard let copy = document.page(at: index)?.copy() as? PDFPage else {
+                throw PDFOperationError.operationFailed("Could not duplicate page \(index + 1)")
+            }
+            document.insert(copy, at: index + 1)
+        }
+        return indices.count
+    }
+
+    @discardableResult
+    public static func deletePages(_ document: PDFDocument, pageIndices: [Int]) throws -> Int {
+        try requirePermission(.pageAssembly, for: document)
+        let indices = try PDFPageSelection.validate(pageIndices, pageCount: document.pageCount)
+        guard indices.count < document.pageCount else {
+            throw PDFOperationError.invalidInput("A PDF must retain at least one page")
+        }
+        for index in indices.reversed() { document.removePage(at: index) }
+        return indices.count
+    }
+
+    @discardableResult
     public static func rotate(_ document: PDFDocument, pageIndices: [Int], degrees: Int) throws -> [PDFRotationChange] {
         try requirePermission(.pageAssembly, for: document)
         guard degrees.isMultiple(of: 90) else {

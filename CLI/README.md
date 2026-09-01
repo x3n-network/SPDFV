@@ -48,7 +48,9 @@ Page specifications are one-based, accept comma-separated inclusive ranges, and 
 
 ## Recipes
 
-Version 1 recipes are deterministic JSON workflows with ordered `renameField`, `fillForm`, `rotate`, `crop`, and `extract` steps. Assertions can require a page range, present or absent text, named fields, and a maximum Form Gate level at any point in the sequence. `recipe-template` prints a starter file, `validate-recipe` executes the complete workflow in memory without writing a PDF, and `run-recipe` writes only after the output survives PDF round-trip verification and Form Gate validation. A recipe may contain at most 100 steps, and page specifications are evaluated against the document state at that step.
+Recipes are deterministic JSON workflows. Version 1 supports ordered `renameField`, `fillForm`, `rotate`, `crop`, and `extract` actions plus page-count, text, field, and Form Gate assertions. Version 2 remains backward-compatible and adds `duplicatePages`, `deletePages`, `ocr`, and `assertSafeShare`. Recipe Press upgrades a v1 composition only when a v2 plate is added.
+
+`recipe-template` prints a v1-compatible starter, `validate-recipe` executes the complete workflow in memory without writing a PDF, and `run-recipe` writes only after the output survives PDF round-trip verification and Form Gate validation. A recipe may contain at most 100 steps, and page specifications are evaluated against the document state at that step. OCR configuration uses the same recognition level, language codes, language-correction flag, and 72–400 DPI range as the standalone command.
 
 `batch-recipe` processes the direct PDF children of an input directory in deterministic filename order. Passing documents are written to the output directory; failed documents produce no PDF. A `spdfv-batch-manifest.json` records every result. The command exits nonzero if any item fails, even though passing outputs and the manifest are still written. Use `--dry-run` without an output directory to validate the entire folder without writing anything.
 

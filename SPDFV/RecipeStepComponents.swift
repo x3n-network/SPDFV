@@ -9,6 +9,7 @@ private struct RecipeStepDraft: Equatable {
     var pages = "all"
     var degree = "90"
     var gate = PDFFormGateLevel.pass.rawValue
+    var quality = PDFOCRRecognitionLevel.accurate.rawValue
 
     init(_ step: PDFRecipeStep) {
         switch step {
@@ -24,6 +25,13 @@ private struct RecipeStepDraft: Equatable {
             tertiary = Self.number(insets.bottom); quaternary = Self.number(insets.left)
         case .extract(let selection):
             pages = selection
+        case .duplicatePages(let selection), .deletePages(let selection):
+            pages = selection
+        case .ocr(let selection, let configuration):
+            pages = selection
+            primary = configuration.languages.joined(separator: ", ")
+            secondary = Self.number(configuration.renderDPI)
+            quality = configuration.recognitionLevel.rawValue
         case .assertPageCount(let minimum, let maximum):
             primary = minimum.map(String.init) ?? ""; secondary = maximum.map(String.init) ?? ""
         case .assertText(let contains, let excludes):
@@ -31,6 +39,8 @@ private struct RecipeStepDraft: Equatable {
         case .assertFields(let names):
             primary = names.joined(separator: ", ")
         case .assertFormGate(let maximum):
+            gate = maximum.rawValue
+        case .assertSafeShare(let maximum):
             gate = maximum.rawValue
         }
     }
@@ -55,6 +65,24 @@ private struct RecipeStepDraft: Equatable {
         case .extract:
             guard !trim(pages).isEmpty else { return nil }
             return .extract(pages: trim(pages))
+        case .duplicatePages:
+            guard !trim(pages).isEmpty else { return nil }
+            return .duplicatePages(pages: trim(pages))
+        case .deletePages:
+            guard !trim(pages).isEmpty else { return nil }
+            return .deletePages(pages: trim(pages))
+        case .ocr:
+            guard !trim(pages).isEmpty,
+                  let dpi = Double(secondary), (72...400).contains(dpi),
+                  let recognitionLevel = PDFOCRRecognitionLevel(rawValue: quality) else { return nil }
+            return .ocr(
+                pages: trim(pages),
+                configuration: PDFOCRConfiguration(
+                    recognitionLevel: recognitionLevel,
+                    languages: list(primary),
+                    renderDPI: dpi
+                )
+            )
         case .assertPageCount:
             let minimumText = trim(primary), maximumText = trim(secondary)
             guard minimumText.isEmpty || Int(minimumText) != nil,
@@ -77,6 +105,9 @@ private struct RecipeStepDraft: Equatable {
         case .assertFormGate:
             guard let level = PDFFormGateLevel(rawValue: gate) else { return nil }
             return .assertFormGate(maximum: level)
+        case .assertSafeShare:
+            guard let level = PDFSafetyGateLevel(rawValue: gate) else { return nil }
+            return .assertSafeShare(maximum: level)
         }
     }
 
@@ -88,10 +119,14 @@ private struct RecipeStepDraft: Equatable {
         case .rotate: "Pages and an integer angle are required"
         case .crop: "Pages and four non-negative inset values are required"
         case .extract: "Enter all, a page, or a page range"
+        case .duplicatePages: "Enter pages to duplicate"
+        case .deletePages: "Enter pages to delete; at least one page must remain"
+        case .ocr: "Enter pages, 72–400 DPI, and a recognition quality"
         case .assertPageCount: "Set a valid minimum, maximum, or both"
         case .assertText: "Enter required or forbidden text"
         case .assertFields: "Enter at least one field name"
         case .assertFormGate: "Choose the highest allowed gate level"
+        case .assertSafeShare: "Choose the highest allowed audit level"
         }
     }
 
@@ -234,6 +269,29 @@ struct RecipeStepEditor: View {
         case .extract:
             pagesField
             RecipeNote("Only selected pages continue to later steps.")
+        case .duplicatePages:
+            pagesField
+            RecipeNote("Each selected page is copied immediately after its original.")
+        case .deletePages:
+            pagesField
+            RecipeNote("Deletion stops if it would remove every page.")
+        case .ocr:
+            pagesField
+            RecipeField(label: "QUALITY", hint: "Fast or accurate recognition") {
+                Picker("", selection: $draft.quality) {
+                    ForEach(PDFOCRRecognitionLevel.allCases, id: \.rawValue) {
+                        Text($0.rawValue.uppercased()).tag($0.rawValue)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+            }
+            RecipeField(label: "LANGUAGES", hint: "Optional comma-separated Vision codes") {
+                recipeTextField("en-US, fr-FR", text: $draft.primary)
+            }
+            RecipeField(label: "RENDER DPI", hint: "72–400") {
+                recipeTextField("216", text: $draft.secondary)
+            }
         case .assertPageCount:
             HStack(spacing: 9) {
                 RecipeField(label: "MINIMUM", hint: "Optional") { recipeTextField("1", text: $draft.primary) }
@@ -254,6 +312,14 @@ struct RecipeStepEditor: View {
             RecipeField(label: "HIGHEST ALLOWED LEVEL", hint: "The run stops above this level") {
                 Picker("", selection: $draft.gate) {
                     ForEach(PDFFormGateLevel.allCases, id: \.rawValue) { Text($0.rawValue.uppercased()).tag($0.rawValue) }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+            }
+        case .assertSafeShare:
+            RecipeField(label: "HIGHEST ALLOWED LEVEL", hint: "The run stops above this level") {
+                Picker("", selection: $draft.gate) {
+                    ForEach(PDFSafetyGateLevel.allCases, id: \.rawValue) { Text($0.rawValue.uppercased()).tag($0.rawValue) }
                 }
                 .labelsHidden()
                 .pickerStyle(.segmented)

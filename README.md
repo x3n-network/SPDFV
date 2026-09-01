@@ -18,7 +18,7 @@ The interface is deliberately compact. It is not a web view in a desktop shell, 
 - Audit metadata, review annotations, filled forms, attachments, and signatures before sharing without copying private values into the report
 - Add an on-device searchable text layer to scanned pages with Vision OCR
 - Create permanent rasterized redactions and verify forbidden text is absent
-- Save and reuse deterministic JSON recipes
+- Build, preview, and reuse versioned JSON recipes with page editing, forms, OCR, Safe Share assertions, and deterministic validation
 - Run recipe queues in the app, in the background, or through `spdfv`
 - Use light, dark, or system appearance
 - Print through the native macOS print panel

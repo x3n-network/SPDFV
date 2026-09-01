@@ -269,6 +269,48 @@ final class SPDFVCLIIntegrationTests: XCTestCase {
         }
     }
 
+    func testRecipeV2RunsPageOCRAndSafeSharePlates() throws {
+        try withFixtureDirectory { directory in
+            let input = directory.appendingPathComponent("input.pdf")
+            let recipe = directory.appendingPathComponent("recipe-v2.json")
+            let output = directory.appendingPathComponent("output.pdf")
+            try makeCompatibilityFixture().write(to: input)
+            let recipeJSON = #"""
+            {
+              "version": 2,
+              "name": "Searchable review copy",
+              "steps": [
+                {"operation":"duplicatePages","pages":"1"},
+                {"operation":"ocr","pages":"2","configuration":{"recognitionLevel":"fast","languages":[],"usesLanguageCorrection":true,"renderDPI":144}},
+                {"operation":"deletePages","pages":"1"},
+                {"operation":"assertSafeShare","maximum":"warning"}
+              ]
+            }
+            """#
+            try XCTUnwrap(recipeJSON.data(using: .utf8)).write(to: recipe)
+
+            let validation = try runCLI([
+                "validate-recipe", input.path, "--recipe", recipe.path, "--pretty"
+            ])
+            XCTAssertEqual(validation.status, 0, validation.stderr)
+            let validationReport = try XCTUnwrap(try jsonObject(validation.stdout)["report"] as? [String: Any])
+            XCTAssertEqual(validationReport["version"] as? Int, 2)
+            XCTAssertEqual(validationReport["outputPageCount"] as? Int, 2)
+
+            let run = try runCLI([
+                "run-recipe", input.path, "--recipe", recipe.path, "--output", output.path, "--pretty"
+            ])
+            XCTAssertEqual(run.status, 0, run.stderr)
+            XCTAssertEqual(PDFDocument(url: output)?.pageCount, 2)
+            let report = try XCTUnwrap(try jsonObject(run.stdout)["report"] as? [String: Any])
+            let steps = try XCTUnwrap(report["steps"] as? [[String: Any]])
+            XCTAssertEqual(
+                steps.compactMap { $0["operation"] as? String },
+                ["duplicatePages", "ocr", "deletePages", "assertSafeShare"]
+            )
+        }
+    }
+
     func testCheckedInCompatibilityCorpusMatchesManifest() throws {
         let corpus = packageRootURL().deletingLastPathComponent()
             .appendingPathComponent("CompatibilityCorpus", isDirectory: true)

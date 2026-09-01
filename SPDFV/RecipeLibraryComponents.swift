@@ -175,8 +175,8 @@ struct RecipeStepDropDelegate: DropDelegate {
 }
 
 enum RecipeOperationKind: String, CaseIterable, Identifiable {
-    case assertPageCount, assertText, assertFields, assertFormGate
-    case renameField, fillForm, rotate, crop, extract
+    case assertPageCount, assertText, assertFields, assertFormGate, assertSafeShare
+    case renameField, fillForm, rotate, crop, extract, duplicatePages, deletePages, ocr
 
     var id: Self { self }
     var isAssertion: Bool { rawValue.hasPrefix("assert") }
@@ -187,11 +187,15 @@ enum RecipeOperationKind: String, CaseIterable, Identifiable {
         case .assertText: "TEXT CHECK"
         case .assertFields: "FIELD CHECK"
         case .assertFormGate: "FORM GATE"
+        case .assertSafeShare: "SAFE SHARE"
         case .renameField: "RENAME FIELD"
         case .fillForm: "FILL FORM"
         case .rotate: "ROTATE"
         case .crop: "CROP"
         case .extract: "EXTRACT"
+        case .duplicatePages: "DUPLICATE"
+        case .deletePages: "DELETE"
+        case .ocr: "OCR"
         }
     }
 
@@ -201,11 +205,15 @@ enum RecipeOperationKind: String, CaseIterable, Identifiable {
         case .assertText: .search
         case .assertFields: .list
         case .assertFormGate: .check
+        case .assertSafeShare: .secureCopy
         case .renameField: .textCursor
         case .fillForm: .editField
         case .rotate: .rotateRight
         case .crop: .crop
         case .extract: .extract
+        case .duplicatePages: .duplicate
+        case .deletePages: .delete
+        case .ocr: .scanText
         }
     }
 
@@ -215,11 +223,15 @@ enum RecipeOperationKind: String, CaseIterable, Identifiable {
         case .assertText: .assertText(contains: ["Required text"], excludes: [])
         case .assertFields: .assertFields(names: ["field.name"])
         case .assertFormGate: .assertFormGate(maximum: .pass)
+        case .assertSafeShare: .assertSafeShare(maximum: .warning)
         case .renameField: .renameField(from: "old.name", to: "new.name")
         case .fillForm: .fillForm(values: ["field.name": "Value"])
         case .rotate: .rotate(pages: "all", degrees: 90)
         case .crop: .crop(pages: "all", insets: .zero)
         case .extract: .extract(pages: "all")
+        case .duplicatePages: .duplicatePages(pages: "1")
+        case .deletePages: .deletePages(pages: "1")
+        case .ocr: .ocr(pages: "all", configuration: PDFOCRConfiguration())
         }
     }
 }

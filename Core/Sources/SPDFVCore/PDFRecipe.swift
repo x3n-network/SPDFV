@@ -2,6 +2,8 @@ import Foundation
 import PDFKit
 
 public struct PDFRecipe: Codable, Equatable, Sendable {
+    public static let latestVersion = 2
+
     public let version: Int
     public let name: String
     public let steps: [PDFRecipeStep]
@@ -29,10 +31,14 @@ public enum PDFRecipeStep: Equatable, Sendable {
     case rotate(pages: String, degrees: Int)
     case crop(pages: String, insets: PDFEdgeInsets)
     case extract(pages: String)
+    case duplicatePages(pages: String)
+    case deletePages(pages: String)
+    case ocr(pages: String, configuration: PDFOCRConfiguration)
     case assertPageCount(minimum: Int?, maximum: Int?)
     case assertText(contains: [String], excludes: [String])
     case assertFields(names: [String])
     case assertFormGate(maximum: PDFFormGateLevel)
+    case assertSafeShare(maximum: PDFSafetyGateLevel)
 
     public var operation: String {
         switch self {
@@ -41,10 +47,14 @@ public enum PDFRecipeStep: Equatable, Sendable {
         case .rotate: "rotate"
         case .crop: "crop"
         case .extract: "extract"
+        case .duplicatePages: "duplicatePages"
+        case .deletePages: "deletePages"
+        case .ocr: "ocr"
         case .assertPageCount: "assertPageCount"
         case .assertText: "assertText"
         case .assertFields: "assertFields"
         case .assertFormGate: "assertFormGate"
+        case .assertSafeShare: "assertSafeShare"
         }
     }
 
@@ -56,6 +66,10 @@ public enum PDFRecipeStep: Equatable, Sendable {
         case .crop(let pages, let insets):
             "Crop pages \(pages) by \(Self.insetsLabel(insets)) pt"
         case .extract(let pages): "Keep pages \(pages)"
+        case .duplicatePages(let pages): "Duplicate pages \(pages)"
+        case .deletePages(let pages): "Delete pages \(pages)"
+        case .ocr(let pages, let configuration):
+            "OCR pages \(pages) at \(Self.number(configuration.renderDPI)) DPI"
         case .assertPageCount(let minimum, let maximum):
             switch (minimum, maximum) {
             case let (minimum?, maximum?): "Require \(minimum)-\(maximum) pages"
@@ -67,6 +81,14 @@ public enum PDFRecipeStep: Equatable, Sendable {
             "Require \(contains.count) and exclude \(excludes.count) text term\(contains.count + excludes.count == 1 ? "" : "s")"
         case .assertFields(let names): "Require \(names.count) field\(names.count == 1 ? "" : "s")"
         case .assertFormGate(let maximum): "Require Form Gate \(maximum.rawValue) or better"
+        case .assertSafeShare(let maximum): "Require Safe Share \(maximum.rawValue) or better"
+        }
+    }
+
+    public var minimumRecipeVersion: Int {
+        switch self {
+        case .duplicatePages, .deletePages, .ocr, .assertSafeShare: 2
+        default: 1
         }
     }
 
@@ -84,7 +106,7 @@ public enum PDFRecipeStep: Equatable, Sendable {
 
 extension PDFRecipeStep: Codable {
     private enum CodingKeys: String, CodingKey {
-        case operation, from, to, values, pages, degrees, insets
+        case operation, from, to, values, pages, degrees, insets, configuration
         case minimum, maximum, contains, excludes, names
     }
 
@@ -111,6 +133,15 @@ extension PDFRecipeStep: Codable {
             )
         case "extract":
             self = .extract(pages: try container.decode(String.self, forKey: .pages))
+        case "duplicatePages":
+            self = .duplicatePages(pages: try container.decode(String.self, forKey: .pages))
+        case "deletePages":
+            self = .deletePages(pages: try container.decode(String.self, forKey: .pages))
+        case "ocr":
+            self = .ocr(
+                pages: try container.decode(String.self, forKey: .pages),
+                configuration: try container.decode(PDFOCRConfiguration.self, forKey: .configuration)
+            )
         case "assertPageCount":
             self = .assertPageCount(
                 minimum: try container.decodeIfPresent(Int.self, forKey: .minimum),
@@ -125,6 +156,8 @@ extension PDFRecipeStep: Codable {
             self = .assertFields(names: try container.decode([String].self, forKey: .names))
         case "assertFormGate":
             self = .assertFormGate(maximum: try container.decode(PDFFormGateLevel.self, forKey: .maximum))
+        case "assertSafeShare":
+            self = .assertSafeShare(maximum: try container.decode(PDFSafetyGateLevel.self, forKey: .maximum))
         default:
             throw DecodingError.dataCorruptedError(
                 forKey: .operation,
@@ -151,6 +184,11 @@ extension PDFRecipeStep: Codable {
             try container.encode(insets, forKey: .insets)
         case .extract(let pages):
             try container.encode(pages, forKey: .pages)
+        case .duplicatePages(let pages), .deletePages(let pages):
+            try container.encode(pages, forKey: .pages)
+        case .ocr(let pages, let configuration):
+            try container.encode(pages, forKey: .pages)
+            try container.encode(configuration, forKey: .configuration)
         case .assertPageCount(let minimum, let maximum):
             try container.encodeIfPresent(minimum, forKey: .minimum)
             try container.encodeIfPresent(maximum, forKey: .maximum)
@@ -160,6 +198,8 @@ extension PDFRecipeStep: Codable {
         case .assertFields(let names):
             try container.encode(names, forKey: .names)
         case .assertFormGate(let maximum):
+            try container.encode(maximum, forKey: .maximum)
+        case .assertSafeShare(let maximum):
             try container.encode(maximum, forKey: .maximum)
         }
     }
@@ -247,6 +287,26 @@ public enum PDFRecipeRunner {
                 case .extract(let pages):
                     let indices = try PDFPageSelection.parse(pages, pageCount: document.pageCount)
                     document = try PDFOperations.extract(document, pageIndices: indices)
+                case .duplicatePages(let pages):
+                    let indices = try PDFPageSelection.parse(pages, pageCount: document.pageCount)
+                    try PDFOperations.duplicatePages(document, pageIndices: indices)
+                case .deletePages(let pages):
+                    let indices = try PDFPageSelection.parse(pages, pageCount: document.pageCount)
+                    try PDFOperations.deletePages(document, pageIndices: indices)
+                case .ocr(let pages, let configuration):
+                    let indices = try PDFPageSelection.parse(pages, pageCount: document.pageCount)
+                    guard let data = document.dataRepresentation() else {
+                        throw PDFOperationError.operationFailed("Could not serialize the PDF before OCR")
+                    }
+                    let result = try PDFOperations.makeSearchable(
+                        data: data,
+                        pageIndices: indices,
+                        configuration: configuration
+                    )
+                    guard let processed = PDFDocument(data: result.data) else {
+                        throw PDFOperationError.operationFailed("Could not reopen the OCR result")
+                    }
+                    document = processed
                 case .assertPageCount(let minimum, let maximum):
                     try Self.assertPageCount(document.pageCount, minimum: minimum, maximum: maximum)
                 case .assertText(let contains, let excludes):
@@ -255,6 +315,8 @@ public enum PDFRecipeRunner {
                     try Self.assertFields(names, document: document)
                 case .assertFormGate(let maximum):
                     try Self.assertFormGate(maximum, document: document)
+                case .assertSafeShare(let maximum):
+                    try Self.assertSafeShare(maximum, document: document)
                 }
                 stepReports.append(Self.stepReport(step, index: offset + 1, document: document))
             } catch {
@@ -298,8 +360,10 @@ public enum PDFRecipeRunner {
     }
 
     private static func validateContract(_ recipe: PDFRecipe) throws {
-        guard recipe.version == 1 else {
-            throw PDFOperationError.invalidInput("Unsupported recipe version \(recipe.version); expected version 1")
+        guard (1...PDFRecipe.latestVersion).contains(recipe.version) else {
+            throw PDFOperationError.invalidInput(
+                "Unsupported recipe version \(recipe.version); expected versions 1...\(PDFRecipe.latestVersion)"
+            )
         }
         guard !recipe.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw PDFOperationError.invalidInput("Recipe name cannot be empty")
@@ -308,6 +372,11 @@ public enum PDFRecipeRunner {
         guard recipe.steps.count <= 100 else { throw PDFOperationError.invalidInput("Recipe cannot exceed 100 steps") }
         for (offset, step) in recipe.steps.enumerated() {
             do {
+                guard recipe.version >= step.minimumRecipeVersion else {
+                    throw PDFOperationError.invalidInput(
+                        "\(step.operation) requires recipe version \(step.minimumRecipeVersion)"
+                    )
+                }
                 try validateStepContract(step)
             } catch {
                 throw PDFOperationError.invalidInput(
@@ -341,6 +410,13 @@ public enum PDFRecipeRunner {
             }
         case .extract(let pages):
             guard !trimmed(pages).isEmpty else { throw PDFOperationError.invalidInput("Page selection cannot be empty") }
+        case .duplicatePages(let pages), .deletePages(let pages):
+            guard !trimmed(pages).isEmpty else { throw PDFOperationError.invalidInput("Page selection cannot be empty") }
+        case .ocr(let pages, let configuration):
+            guard !trimmed(pages).isEmpty else { throw PDFOperationError.invalidInput("Page selection cannot be empty") }
+            guard configuration.renderDPI.isFinite, (72...400).contains(configuration.renderDPI) else {
+                throw PDFOperationError.invalidInput("OCR DPI must be between 72 and 400")
+            }
         case .assertPageCount(let minimum, let maximum):
             guard minimum != nil || maximum != nil else {
                 throw PDFOperationError.invalidInput("assertPageCount requires minimum, maximum, or both")
@@ -360,7 +436,7 @@ public enum PDFRecipeRunner {
             guard names.contains(where: { !trimmed($0).isEmpty }) else {
                 throw PDFOperationError.invalidInput("assertFields requires at least one name")
             }
-        case .assertFormGate:
+        case .assertFormGate, .assertSafeShare:
             break
         }
     }
@@ -416,6 +492,15 @@ public enum PDFRecipeRunner {
         let gate = PDFOperations.formGate(for: report)
         guard gate.level <= maximum else {
             throw PDFOperationError.operationFailed("Form Gate is \(gate.level.rawValue); required \(maximum.rawValue) or better")
+        }
+    }
+
+    private static func assertSafeShare(_ maximum: PDFSafetyGateLevel, document: PDFDocument) throws {
+        let report = PDFOperations.safeShareAudit(for: document)
+        guard report.level <= maximum else {
+            throw PDFOperationError.operationFailed(
+                "Safe Share is \(report.level.rawValue); required \(maximum.rawValue) or better"
+            )
         }
     }
 

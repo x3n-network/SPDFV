@@ -47,7 +47,11 @@ func addRecipeStep(_ step: PDFRecipeStep, after index: Int? = nil) {
     var steps = recipe.steps
     let insertionIndex = min(max(0, (index ?? (steps.count - 1)) + 1), steps.count)
     steps.insert(step, at: insertionIndex)
-    loadedRecipe = PDFRecipe(version: recipe.version, name: recipe.name, steps: steps)
+    loadedRecipe = PDFRecipe(
+        version: max(recipe.version, step.minimumRecipeVersion),
+        name: recipe.name,
+        steps: steps
+    )
     markRecipeEdited()
 }
 
@@ -55,7 +59,11 @@ func updateRecipeStep(at index: Int, to step: PDFRecipeStep) {
     guard let recipe = loadedRecipe, recipe.steps.indices.contains(index), recipe.steps[index] != step else { return }
     var steps = recipe.steps
     steps[index] = step
-    loadedRecipe = PDFRecipe(version: recipe.version, name: recipe.name, steps: steps)
+    loadedRecipe = PDFRecipe(
+        version: max(recipe.version, step.minimumRecipeVersion),
+        name: recipe.name,
+        steps: steps
+    )
     markRecipeEdited()
 }
 

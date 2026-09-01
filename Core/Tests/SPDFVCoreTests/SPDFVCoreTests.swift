@@ -444,8 +444,72 @@ final class SPDFVCoreTests: XCTestCase {
         let unknown = #"{"version":1,"name":"Bad","steps":[{"operation":"flatten"}]}"#
         XCTAssertThrowsError(try PDFRecipeRunner.decode(try XCTUnwrap(unknown.data(using: .utf8))))
 
-        let future = PDFRecipe(version: 2, name: "Future", steps: [.extract(pages: "all")])
+        let future = PDFRecipe(version: 3, name: "Future", steps: [.extract(pages: "all")])
         XCTAssertThrowsError(try PDFRecipeRunner.run(future, on: try XCTUnwrap(makeDocument(pageNumbers: [1]).dataRepresentation())))
+
+        let mismatched = PDFRecipe(version: 1, name: "Old schema", steps: [.duplicatePages(pages: "1")])
+        XCTAssertThrowsError(try PDFRecipeRunner.validate(mismatched)) { error in
+            XCTAssertTrue(String(describing: error).contains("requires recipe version 2"))
+        }
+    }
+
+    func testRecipeV2ComposesPageOperationsOCRAndSafeShareGate() throws {
+        let image = NSImage(size: NSSize(width: 420, height: 160))
+        image.lockFocus()
+        NSColor.white.setFill()
+        NSRect(origin: .zero, size: image.size).fill()
+        ("RECIPE OCR" as NSString).draw(
+            at: NSPoint(x: 36, y: 64),
+            withAttributes: [
+                .font: NSFont.systemFont(ofSize: 44, weight: .bold),
+                .foregroundColor: NSColor.black
+            ]
+        )
+        image.unlockFocus()
+        let source = PDFDocument()
+        source.insert(try XCTUnwrap(PDFPage(image: image)), at: 0)
+
+        let recipe = PDFRecipe(
+            version: 2,
+            name: "Searchable proof",
+            steps: [
+                .assertSafeShare(maximum: .warning),
+                .duplicatePages(pages: "1"),
+                .ocr(
+                    pages: "2",
+                    configuration: PDFOCRConfiguration(recognitionLevel: .fast, renderDPI: 144)
+                ),
+                .deletePages(pages: "1"),
+                .assertPageCount(minimum: 1, maximum: 1)
+            ]
+        )
+
+        let encoded = try PDFRecipeRunner.encode(recipe)
+        XCTAssertEqual(try PDFRecipeRunner.decode(encoded), recipe)
+        let result = try PDFRecipeRunner.run(recipe, on: try XCTUnwrap(source.dataRepresentation()))
+        let reopened = try XCTUnwrap(PDFDocument(data: result.data))
+
+        XCTAssertEqual(result.report.version, 2)
+        XCTAssertEqual(result.report.inputPageCount, 1)
+        XCTAssertEqual(result.report.outputPageCount, 1)
+        XCTAssertEqual(
+            result.report.steps.map(\.operation),
+            ["assertSafeShare", "duplicatePages", "ocr", "deletePages", "assertPageCount"]
+        )
+        XCTAssertEqual(reopened.pageCount, 1)
+    }
+
+    func testPageDuplicationAndDeletionPreserveOrderAndRequireOnePage() throws {
+        let document = makeDocument(pageNumbers: [1, 2, 3])
+
+        XCTAssertEqual(try PDFOperations.duplicatePages(document, pageIndices: [0, 2]), 2)
+        XCTAssertEqual(document.pageCount, 5)
+        XCTAssertEqual((0..<5).compactMap { identity(document.page(at: $0)) }, ["PAGE-1", "PAGE-1", "PAGE-2", "PAGE-3", "PAGE-3"])
+
+        XCTAssertEqual(try PDFOperations.deletePages(document, pageIndices: [1, 3]), 2)
+        XCTAssertEqual((0..<3).compactMap { identity(document.page(at: $0)) }, ["PAGE-1", "PAGE-2", "PAGE-3"])
+        XCTAssertThrowsError(try PDFOperations.deletePages(document, pageIndices: [0, 1, 2]))
+        XCTAssertEqual(document.pageCount, 3)
     }
 
     func testRecipeAssertionsObserveCurrentDocumentState() throws {
