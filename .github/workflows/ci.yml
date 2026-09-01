@@ -22,12 +22,25 @@ jobs:
       - name: Build CLI
         run: swift build --package-path CLI -c release
 
-      - name: Build app without signing
+      - name: Test CLI integration
+        run: swift test --package-path CLI
+
+      - name: Test app without signing
         run: >-
           xcodebuild
           -project SPDFV.xcodeproj
           -scheme SPDFV
           -configuration Debug
+          -destination 'platform=macOS'
+          CODE_SIGNING_ALLOWED=NO
+          test
+
+      - name: Build release app without signing
+        run: >-
+          xcodebuild
+          -project SPDFV.xcodeproj
+          -scheme SPDFV
+          -configuration Release
           -destination 'platform=macOS'
           CODE_SIGNING_ALLOWED=NO
           build

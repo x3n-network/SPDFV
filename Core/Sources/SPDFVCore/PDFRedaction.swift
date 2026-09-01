@@ -74,6 +74,7 @@ public extension PDFOperations {
         guard let document = PDFDocument(data: data), document.pageCount > 0 else {
             throw PDFOperationError.invalidInput("Input is not a readable PDF")
         }
+        try requirePermission(.contentCopying, for: document)
         guard !regions.isEmpty else {
             throw PDFOperationError.invalidInput("At least one redaction region is required")
         }

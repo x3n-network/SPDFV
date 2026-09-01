@@ -15,6 +15,10 @@ let package = Package(
         .executableTarget(
             name: "SPDFVCLI",
             dependencies: [.product(name: "SPDFVCore", package: "Core")]
+        ),
+        .testTarget(
+            name: "SPDFVCLIIntegrationTests",
+            dependencies: [.product(name: "SPDFVCore", package: "Core")]
         )
     ]
 )

@@ -4,9 +4,9 @@ SPDFV is a macOS application with a shared core and CLI. Changes should preserve
 
 ## Before opening a change
 
-1. Build the app with signing disabled.
+1. Run the `SPDFV` scheme's tests with signing disabled.
 2. Run `swift test --package-path Core`.
-3. If the shared core changed, rebuild `CLI` and exercise the relevant command.
+3. Run `swift test --package-path CLI`; if the shared core changed, also exercise the relevant command manually.
 4. Test both light and dark appearance for visible interface changes.
 5. Test with a copy of the PDF, especially for forms, redaction, page deletion, and saving.
 
@@ -17,6 +17,12 @@ SPDFV is a macOS application with a shared core and CLI. Changes should preserve
 - Do not add network processing for document content without an explicit design discussion.
 - Protect existing output files unless an operation clearly asks for replacement.
 - Prefer focused changes over broad restyling or renaming.
+
+## Compatibility tests
+
+App tests use small generated PDFs to verify `DocumentSession` state transitions without checking in document fixtures. Add a focused state assertion when changing page selection, edit history, or recipe composition behavior.
+
+CLI integration tests generate deterministic PDFKit fixtures at runtime and exercise the compiled `spdfv` executable. Keep fixtures small and focused on one compatibility behavior. When a bug requires an external PDF, use a redistributable, non-sensitive sample, record its source and license, and add a save/reopen assertion that captures the regression.
 
 ## Contribution license
 

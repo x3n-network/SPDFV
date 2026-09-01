@@ -8,6 +8,7 @@ CLI/.build/release/spdfv inspect document.pdf --pretty
 CLI/.build/release/spdfv annotations document.pdf --pages all --pretty
 CLI/.build/release/spdfv forms intake.pdf --pretty
 CLI/.build/release/spdfv form-gate intake.pdf --pretty
+CLI/.build/release/spdfv safety-gate intake.pdf --pretty
 CLI/.build/release/spdfv fill-form intake.pdf --values '{"full_name":"Ada Lovelace","approved":"true"}' --output completed.pdf
 CLI/.build/release/spdfv add-field intake.pdf --page 1 --type text --name reviewer --bounds 72,540,220,32 --output authored.pdf
 CLI/.build/release/spdfv rename-field authored.pdf --from reviewer --to review.owner --output renamed.pdf
@@ -31,6 +32,8 @@ CLI/.build/release/spdfv redact report.pdf --regions '1:72,640,180,32;2:80,500,2
 Page specifications are one-based, accept comma-separated inclusive ranges, and preserve document order. Crop insets accept either one uniform point value or `top,right,bottom,left`. Existing output files are protected unless `--force` is supplied.
 
 ## Interactive forms
+
+`safety-gate` reports encryption and lock state, all seven PDF access permissions, certificate-signature field names, and a pass, warning, or stop result. Signature fields are reported conservatively: SPDFV does not yet perform cryptographic signature validation. Run this preflight before an automated editing workflow when preserving document protections matters.
 
 `forms` reports every page widget, its canonical field name, type, value, bounds, choices, read-only status, and whether it has a normal appearance stream. `fill-form` accepts a JSON object of string values, keeps the output interactive, repairs genuinely orphaned PDFKit widgets during the write, and reopens the result to verify the canonical `/AcroForm/Fields` tree, widget values, and `/AP` `/N` appearances. Boolean button values accept `true`, `yes`, `on`, `checked`, or `1`.
 

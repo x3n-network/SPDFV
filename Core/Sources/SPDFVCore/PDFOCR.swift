@@ -88,6 +88,7 @@ public extension PDFOperations {
         guard let document = PDFDocument(data: data), document.pageCount > 0 else {
             throw PDFOperationError.invalidInput("Input is not a readable PDF")
         }
+        try requirePermission(.contentCopying, for: document)
         let indices = try PDFPageSelection.validate(
             pageIndices ?? Array(0..<document.pageCount),
             pageCount: document.pageCount

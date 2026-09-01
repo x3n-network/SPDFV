@@ -232,6 +232,7 @@ public enum PDFOperations {
     }
 
     public static func extract(_ document: PDFDocument, pageIndices: [Int]) throws -> PDFDocument {
+        try requirePermission(.contentCopying, for: document)
         let indices = try PDFPageSelection.validate(pageIndices, pageCount: document.pageCount)
         let result = PDFDocument()
         result.documentAttributes = document.documentAttributes
@@ -251,6 +252,8 @@ public enum PDFOperations {
         into destination: PDFDocument,
         at insertionIndex: Int
     ) throws -> [Int] {
+        try requirePermission(.contentCopying, for: source)
+        try requirePermission(.pageAssembly, for: destination)
         let indices = try PDFPageSelection.validate(pageIndices, pageCount: source.pageCount)
         let insertionIndex = min(max(0, insertionIndex), destination.pageCount)
         var inserted: [Int] = []
@@ -282,6 +285,7 @@ public enum PDFOperations {
 
     @discardableResult
     public static func rotate(_ document: PDFDocument, pageIndices: [Int], degrees: Int) throws -> [PDFRotationChange] {
+        try requirePermission(.pageAssembly, for: document)
         guard degrees.isMultiple(of: 90) else {
             throw PDFOperationError.invalidInput("Rotation must be a multiple of 90 degrees")
         }
@@ -296,6 +300,7 @@ public enum PDFOperations {
 
     @discardableResult
     public static func crop(_ document: PDFDocument, pageIndices: [Int], insets: PDFEdgeInsets) throws -> [PDFCropChange] {
+        try requirePermission(.pageAssembly, for: document)
         let indices = try PDFPageSelection.validate(pageIndices, pageCount: document.pageCount)
         return indices.compactMap { index in
             guard let page = document.page(at: index) else { return nil }

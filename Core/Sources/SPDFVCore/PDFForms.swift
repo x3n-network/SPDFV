@@ -116,6 +116,7 @@ public extension PDFOperations {
         pageIndex: Int,
         bounds: CGRect
     ) throws -> PDFAnnotation {
+        try requirePermission(.annotations, for: document)
         guard let page = document.page(at: pageIndex) else {
             throw PDFOperationError.invalidPageSelection("Page \(pageIndex + 1) is outside the document")
         }
@@ -179,6 +180,7 @@ public extension PDFOperations {
         guard let document = PDFDocument(data: data) else {
             throw PDFOperationError.invalidInput("Input is not a readable PDF")
         }
+        try requirePermission(.formEntry, for: document)
         let initial = formReport(for: document)
         guard initial.widgetCount > 0 else {
             throw PDFOperationError.invalidInput("PDF does not contain any interactive form widgets")
@@ -373,6 +375,7 @@ public extension PDFOperations {
     }
 
     static func applyFormValue(_ value: String, named name: String, in document: PDFDocument) throws {
+        try requirePermission(.formEntry, for: document)
         let matching = (0..<document.pageCount).flatMap { document.page(at: $0)?.annotations ?? [] }
             .filter { isFormWidget($0) && $0.fieldName == name }
         guard !matching.isEmpty else { throw PDFOperationError.invalidInput("Form field not found: \(name)") }
@@ -394,6 +397,7 @@ public extension PDFOperations {
     /// name cannot diverge between pages.
     @discardableResult
     static func renameFormField(named currentName: String, to proposedName: String, in document: PDFDocument) throws -> Int {
+        try requirePermission(.annotations, for: document)
         let source = currentName.trimmingCharacters(in: .whitespacesAndNewlines)
         let destination = proposedName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !source.isEmpty else { throw PDFOperationError.invalidInput("Current field name cannot be empty") }

@@ -14,6 +14,7 @@ The interface is deliberately compact. It is not a web view in a desktop shell, 
 - Highlight, underline, strike, draw, add notes, and place signatures
 - Reorder, rotate, duplicate, extract, append, crop, and delete pages
 - Inspect, fill, create, rename, and validate interactive form fields
+- Preflight document protections and unlock password-protected PDFs without retaining the password
 - Add an on-device searchable text layer to scanned pages with Vision OCR
 - Create permanent rasterized redactions and verify forbidden text is absent
 - Save and reuse deterministic JSON recipes
@@ -65,11 +66,29 @@ Run the shared-core tests:
 swift test --package-path Core
 ```
 
+Run the native app tests:
+
+```sh
+xcodebuild \
+  -project SPDFV.xcodeproj \
+  -scheme SPDFV \
+  -configuration Debug \
+  -destination 'platform=macOS' \
+  CODE_SIGNING_ALLOWED=NO \
+  test
+```
+
 Build the CLI:
 
 ```sh
 swift build --package-path CLI -c release
 CLI/.build/release/spdfv help
+```
+
+Run the CLI integration tests:
+
+```sh
+swift test --package-path CLI
 ```
 
 The full command reference and examples live in [CLI/README.md](CLI/README.md).
@@ -78,6 +97,7 @@ The full command reference and examples live in [CLI/README.md](CLI/README.md).
 
 ```text
 SPDFV/       macOS app
+SPDFVTests/  native app state-transition tests
 Core/        shared PDFKit operations and tests
 CLI/         spdfv command-line executable
 QueueRunner/ opt-in background queue helper

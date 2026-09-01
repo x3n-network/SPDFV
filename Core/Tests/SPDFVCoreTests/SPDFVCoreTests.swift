@@ -4,6 +4,76 @@ import XCTest
 @testable import SPDFVCore
 
 final class SPDFVCoreTests: XCTestCase {
+    func testSafetyGateReportsPlainLockedAndRestrictedDocuments() throws {
+        let plain = makeDocument(pageNumbers: [1])
+        let plainGate = PDFOperations.safetyGate(for: plain)
+        XCTAssertEqual(plainGate.level, .pass)
+        XCTAssertTrue(plainGate.canReadContent)
+        XCTAssertTrue(plainGate.canEditContent)
+        XCTAssertTrue(plainGate.permissions.restrictedCapabilities.isEmpty)
+
+        let encryptionOptions: [PDFDocumentWriteOption: Any] = [
+            .ownerPasswordOption: "owner-secret",
+            .userPasswordOption: "user-secret",
+            .accessPermissionsOption: NSNumber(value: 0)
+        ]
+        let encryptedData = try XCTUnwrap(plain.dataRepresentation(options: encryptionOptions))
+        let encrypted = try XCTUnwrap(PDFDocument(data: encryptedData))
+
+        let lockedGate = PDFOperations.safetyGate(for: encrypted)
+        XCTAssertTrue(lockedGate.encrypted)
+        XCTAssertTrue(lockedGate.locked)
+        XCTAssertEqual(lockedGate.level, .stop)
+        XCTAssertFalse(lockedGate.canReadContent)
+        XCTAssertEqual(lockedGate.issues.map(\.id), ["locked-document"])
+        XCTAssertFalse(lockedGate.decision(for: .contentCopying).allowed)
+        XCTAssertTrue(lockedGate.decision(for: .contentCopying).reason?.contains("Unlock") == true)
+
+        XCTAssertTrue(encrypted.unlock(withPassword: "user-secret"))
+        let unlockedGate = PDFOperations.safetyGate(for: encrypted)
+        XCTAssertTrue(unlockedGate.encrypted)
+        XCTAssertFalse(unlockedGate.locked)
+        XCTAssertEqual(unlockedGate.level, .warning)
+        XCTAssertFalse(unlockedGate.canEditContent)
+        XCTAssertFalse(unlockedGate.canAssemblePages)
+        XCTAssertFalse(unlockedGate.canFillForms)
+        XCTAssertTrue(unlockedGate.permissions.restrictedCapabilities.contains("document changes"))
+        XCTAssertEqual(unlockedGate.issues.map(\.id), ["encrypted-document", "restricted-permissions"])
+        for capability in PDFMutationCapability.allCases {
+            let decision = unlockedGate.decision(for: capability)
+            XCTAssertFalse(decision.allowed)
+            XCTAssertNotNil(decision.reason)
+            XCTAssertThrowsError(try PDFOperations.requirePermission(capability, for: encrypted))
+        }
+        XCTAssertThrowsError(try PDFOperations.extract(encrypted, pageIndices: [0]))
+        XCTAssertThrowsError(try PDFOperations.rotate(encrypted, pageIndices: [0], degrees: 90))
+        XCTAssertThrowsError(try PDFOperations.addFormField(
+            PDFFormFieldDraft(name: "blocked", kind: .text),
+            to: encrypted,
+            pageIndex: 0,
+            bounds: CGRect(x: 72, y: 600, width: 180, height: 30)
+        ))
+    }
+
+    func testSafetyGateConservativelyReportsCertificateSignatureFields() throws {
+        let document = makeDocument(pageNumbers: [1])
+        let page = try XCTUnwrap(document.page(at: 0))
+        let signature = PDFAnnotation(
+            bounds: CGRect(x: 72, y: 620, width: 220, height: 48),
+            forType: .widget,
+            withProperties: nil
+        )
+        signature.widgetFieldType = .signature
+        signature.fieldName = "approval.signature"
+        page.addAnnotation(signature)
+
+        let gate = PDFOperations.safetyGate(for: document)
+        XCTAssertEqual(gate.level, .warning)
+        XCTAssertEqual(gate.certificateSignatureFields, ["approval.signature"])
+        XCTAssertEqual(gate.issues.map(\.id), ["certificate-signatures"])
+        XCTAssertTrue(gate.issues[0].detail.contains("not validated"))
+    }
+
     func testPageSelectionParsesRangesAndDeduplicates() throws {
         XCTAssertEqual(try PDFPageSelection.parse("1,3-5,3", pageCount: 6), [0, 2, 3, 4])
         XCTAssertEqual(try PDFPageSelection.parse("all", pageCount: 3), [0, 1, 2])
