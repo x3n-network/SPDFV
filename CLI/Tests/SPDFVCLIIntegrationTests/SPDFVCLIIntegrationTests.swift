@@ -114,6 +114,133 @@ final class SPDFVCLIIntegrationTests: XCTestCase {
         }
     }
 
+    func testAnnotationsFiltersPagesAndEmitsCanonicalRecords() throws {
+        try withFixtureDirectory { directory in
+            let input = directory.appendingPathComponent("annotations.pdf")
+            try makeCompatibilityFixture().write(to: input)
+
+            let result = try runCLI(["annotations", input.path, "--pages", "2", "--pretty"])
+
+            XCTAssertEqual(result.status, 0, result.stderr)
+            let report = try jsonObject(result.stdout)
+            XCTAssertEqual(report["pages"] as? [Int], [2])
+            XCTAssertEqual(report["count"] as? Int, 1)
+            let annotations = try XCTUnwrap(report["annotations"] as? [[String: Any]])
+            XCTAssertEqual(annotations.first?["page"] as? Int, 2)
+            XCTAssertEqual(annotations.first?["contents"] as? String, "Fixture page 2")
+        }
+    }
+
+    func testExtractMergeAndCropProduceReopenablePageGeometry() throws {
+        try withFixtureDirectory { directory in
+            let input = directory.appendingPathComponent("input.pdf")
+            let extracted = directory.appendingPathComponent("extracted.pdf")
+            let merged = directory.appendingPathComponent("merged.pdf")
+            let cropped = directory.appendingPathComponent("cropped.pdf")
+            try makeCompatibilityFixture().write(to: input)
+
+            let extractResult = try runCLI([
+                "extract", input.path, "--pages", "2", "--output", extracted.path
+            ])
+            XCTAssertEqual(extractResult.status, 0, extractResult.stderr)
+            XCTAssertEqual(try jsonObject(extractResult.stdout)["pages"] as? [Int], [2])
+            XCTAssertEqual(PDFDocument(url: extracted)?.pageCount, 1)
+
+            let mergeResult = try runCLI([
+                "merge", extracted.path, input.path, "--output", merged.path
+            ])
+            XCTAssertEqual(mergeResult.status, 0, mergeResult.stderr)
+            XCTAssertEqual(try jsonObject(mergeResult.stdout)["pageCount"] as? Int, 3)
+
+            let media = try XCTUnwrap(PDFDocument(url: merged)?.page(at: 0)?.bounds(for: .mediaBox))
+            let cropResult = try runCLI([
+                "crop", merged.path, "--pages", "1", "--insets", "10", "--output", cropped.path
+            ])
+            XCTAssertEqual(cropResult.status, 0, cropResult.stderr)
+            let reopened = try XCTUnwrap(PDFDocument(url: cropped))
+            let after = try XCTUnwrap(reopened.page(at: 0)?.bounds(for: .cropBox))
+            XCTAssertEqual(after.width, media.width - 20, accuracy: 0.01)
+            XCTAssertEqual(after.height, media.height - 20, accuracy: 0.01)
+            XCTAssertEqual(reopened.pageCount, 3)
+        }
+    }
+
+    func testFormAuthorFillAndRenameRoundTrip() throws {
+        try withFixtureDirectory { directory in
+            let input = directory.appendingPathComponent("input.pdf")
+            let authored = directory.appendingPathComponent("authored.pdf")
+            let filled = directory.appendingPathComponent("filled.pdf")
+            let renamed = directory.appendingPathComponent("renamed.pdf")
+            try makeCompatibilityFixture().write(to: input)
+
+            let addResult = try runCLI([
+                "add-field", input.path,
+                "--page", "1", "--type", "text", "--name", "reviewer",
+                "--bounds", "72,420,220,32", "--output", authored.path
+            ])
+            XCTAssertEqual(addResult.status, 0, addResult.stderr)
+            XCTAssertEqual((try jsonObject(addResult.stdout)["field"] as? [String: Any])?["name"] as? String, "reviewer")
+
+            let fillResult = try runCLI([
+                "fill-form", authored.path,
+                "--values", "{\"reviewer\":\"Ada\"}", "--output", filled.path
+            ])
+            XCTAssertEqual(fillResult.status, 0, fillResult.stderr)
+            XCTAssertEqual(try jsonObject(fillResult.stdout)["updatedFields"] as? [String], ["reviewer"])
+
+            let renameResult = try runCLI([
+                "rename-field", filled.path,
+                "--from", "reviewer", "--to", "review.owner", "--output", renamed.path
+            ])
+            XCTAssertEqual(renameResult.status, 0, renameResult.stderr)
+            XCTAssertEqual(try jsonObject(renameResult.stdout)["widgetCount"] as? Int, 1)
+
+            let reopened = try XCTUnwrap(PDFDocument(url: renamed))
+            let widget = try XCTUnwrap(reopened.page(at: 0)?.annotations.first(where: { $0.fieldName == "review.owner" }))
+            XCTAssertEqual(widget.widgetStringValue, "Ada")
+        }
+    }
+
+    func testRecipeTemplateValidateEnqueueAndRunQueue() throws {
+        try withFixtureDirectory { directory in
+            let input = directory.appendingPathComponent("input.pdf")
+            let recipe = directory.appendingPathComponent("recipe.json")
+            let output = directory.appendingPathComponent("output.pdf")
+            let queue = directory.appendingPathComponent("queue.json")
+            try makeCompatibilityFixture().write(to: input)
+
+            let templateResult = try runCLI(["recipe-template"])
+            XCTAssertEqual(templateResult.status, 0, templateResult.stderr)
+            try XCTUnwrap(templateResult.stdout.data(using: .utf8)).write(to: recipe)
+
+            let validateResult = try runCLI([
+                "validate-recipe", input.path, "--recipe", recipe.path
+            ])
+            XCTAssertEqual(validateResult.status, 0, validateResult.stderr)
+            let validation = try XCTUnwrap(try jsonObject(validateResult.stdout)["report"] as? [String: Any])
+            XCTAssertEqual(validation["dryRun"] as? Bool, true)
+            XCTAssertEqual(validation["outputPageCount"] as? Int, 2)
+
+            let enqueueResult = try runCLI([
+                "enqueue-recipe", input.path,
+                "--recipe", recipe.path, "--output", output.path, "--queue", queue.path
+            ])
+            XCTAssertEqual(enqueueResult.status, 0, enqueueResult.stderr)
+            XCTAssertEqual((try jsonObject(enqueueResult.stdout)["summary"] as? [String: Any])?["queued"] as? Int, 1)
+
+            let runResult = try runCLI(["run-queue", "--queue", queue.path])
+            XCTAssertEqual(runResult.status, 0, runResult.stderr)
+            let summary = try XCTUnwrap(try jsonObject(runResult.stdout)["summary"] as? [String: Any])
+            XCTAssertEqual(summary["passed"] as? Int, 1)
+            XCTAssertEqual(summary["failed"] as? Int, 0)
+            XCTAssertEqual(PDFDocument(url: output)?.pageCount, 2)
+
+            let statusResult = try runCLI(["queue-status", "--queue", queue.path])
+            XCTAssertEqual(statusResult.status, 0, statusResult.stderr)
+            XCTAssertEqual((try jsonObject(statusResult.stdout)["summary"] as? [String: Any])?["passed"] as? Int, 1)
+        }
+    }
+
     private func makeCompatibilityFixture() throws -> Data {
         let document = PDFDocument()
         document.documentAttributes = [

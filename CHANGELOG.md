@@ -7,6 +7,7 @@
 - Split Recipe Press, document safety UI, navigation and annotation models, page operations, OCR, redaction, recipe automation, forms, and edit history out of the largest app source files to make future changes easier to isolate
 - Added native app tests for document lifecycle, encrypted unlock, save-as, page selection and geometry, edit history, annotations, forms, and recipe composition state transitions
 - Added stable accessibility identifiers and UI automation for empty, document, automation, and encrypted-document flows
+- Expanded executable-level CLI tests across annotations, page assembly and crop, form authoring, recipes, and durable queues
 
 ## 0.1.2 - 2026-08-31
 
