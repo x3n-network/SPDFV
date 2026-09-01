@@ -6,6 +6,8 @@ SPDFV is a native PDF workspace for macOS. It opens quickly for ordinary reading
 
 The interface is deliberately compact. It is not a web view in a desktop shell, and documents do not leave the Mac for routine processing.
 
+[Project website](https://x3n.network/opensource/spdfv/) · [Download the current signed release](https://github.com/x3n-network/SPDFV/releases/latest) · [CLI reference](CLI/README.md)
+
 ## Current capabilities
 
 - Open PDFs from Finder, the Open panel, recent documents, or drag and drop
@@ -28,7 +30,7 @@ The interface is deliberately compact. It is not a web view in a desktop shell, 
 - Use light, dark, or system appearance
 - Print through the native macOS print panel
 
-SPDFV is pre-release software. Keep an original copy of important documents while the editor is still being hardened.
+SPDFV is pre-release software. Keep an original copy of important documents while the editor is still being hardened. This README describes the current `main` branch; the signed build on the project website may trail capabilities that are awaiting the next release.
 
 ## Interface
 
@@ -66,44 +68,31 @@ xcodebuild \
   build
 ```
 
-Run the shared-core tests:
+## Validate changes
+
+Run the same repository audit, PDFKit round-trip smoke test, package tests, native app tests, and unsigned UI automation build used by CI:
 
 ```sh
-swift test --package-path Core
+bash Scripts/validate_project.sh
 ```
 
-Run the focused performance measurements:
+Use release optimization for Core and CLI when changing performance-sensitive PDF behavior or preparing a release:
+
+```sh
+bash Scripts/validate_project.sh --release
+```
+
+On a Mac where the test runner has Accessibility permission, execute the UI suite instead of only building it:
+
+```sh
+RUN_UI_TESTS=1 bash Scripts/validate_project.sh
+```
+
+Run only the focused performance measurements when iterating on large-document behavior:
 
 ```sh
 swift test --package-path Core --filter PDFPerformanceTests
 ```
-
-Run the native app tests:
-
-```sh
-xcodebuild \
-  -project SPDFV.xcodeproj \
-  -scheme SPDFV \
-  -configuration Debug \
-  -destination 'platform=macOS' \
-  -only-testing:SPDFVTests \
-  CODE_SIGNING_ALLOWED=NO \
-  test
-```
-
-Build the UI automation bundle without signing:
-
-```sh
-xcodebuild \
-  -project SPDFV.xcodeproj \
-  -scheme SPDFV \
-  -configuration Debug \
-  -destination 'platform=macOS' \
-  CODE_SIGNING_ALLOWED=NO \
-  build-for-testing
-```
-
-Run `-only-testing:SPDFVUITests test` from a signed local build when the test runner has macOS Accessibility permission.
 
 Build the CLI:
 
