@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added a privacy-preserving Safe Share audit for metadata, review annotations, filled form fields, attachments, encryption, and signature fields across Core, CLI, and the native document inspector
 - Added a Document Safety Gate for encryption, permissions, and certificate-signature fields, with in-app password unlocking and machine-readable CLI output
 - Enforced PDF access permissions across page editing, annotations, forms, OCR, redaction, recipes, and CLI operations
 - Split Recipe Press, document safety UI, navigation and annotation models, page operations, OCR, redaction, recipe automation, forms, and edit history out of the largest app source files to make future changes easier to isolate

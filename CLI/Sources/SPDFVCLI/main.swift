@@ -111,6 +111,11 @@ private struct SafetyGateInspectionReport: Encodable {
     let gate: PDFSafetyGateReport
 }
 
+private struct SafeShareInspectionReport: Encodable {
+    let input: String
+    let report: PDFSafeShareReport
+}
+
 private struct FormFillOperationReport: Encodable {
     let operation: String
     let input: String
@@ -347,6 +352,20 @@ private func safetyGate(_ arguments: [String]) throws {
     let document = try PDFOperations.open(url)
     print(try encode(
         SafetyGateInspectionReport(input: url.path, gate: PDFOperations.safetyGate(for: document)),
+        pretty: parser.flags.contains("--pretty")
+    ))
+}
+
+private func safeShare(_ arguments: [String]) throws {
+    let parser = try OptionParser(arguments)
+    try parser.rejectUnknownOptions(allowing: [])
+    guard parser.positional.count == 1 else {
+        throw CLIError.usage("safe-share requires exactly one input PDF")
+    }
+    let url = fileURL(parser.positional[0])
+    let document = try PDFOperations.open(url)
+    print(try encode(
+        SafeShareInspectionReport(input: url.path, report: PDFOperations.safeShareAudit(for: document)),
         pretty: parser.flags.contains("--pretty")
     ))
 }
@@ -1050,6 +1069,7 @@ USAGE
   spdfv forms <input.pdf> [--pretty]
   spdfv form-gate <input.pdf> [--pretty]
   spdfv safety-gate <input.pdf> [--pretty]
+  spdfv safe-share <input.pdf> [--pretty]
   spdfv fill-form <input.pdf> --values <json-object> --output <output.pdf> [--force] [--pretty]
   spdfv add-field <input.pdf> --page <n> --type <text|checkbox|choice> --name <field> --bounds <x,y,w,h> [--value <text>] [--choices <a,b,c>] --output <output.pdf> [--force] [--pretty]
   spdfv rename-field <input.pdf> --from <field> --to <field> --output <output.pdf> [--force] [--pretty]
@@ -1090,6 +1110,7 @@ do {
     case "forms": try forms(Array(arguments.dropFirst()))
     case "form-gate": try formGate(Array(arguments.dropFirst()))
     case "safety-gate": try safetyGate(Array(arguments.dropFirst()))
+    case "safe-share": try safeShare(Array(arguments.dropFirst()))
     case "fill-form": try fillForm(Array(arguments.dropFirst()))
     case "add-field": try addField(Array(arguments.dropFirst()))
     case "rename-field": try renameField(Array(arguments.dropFirst()))

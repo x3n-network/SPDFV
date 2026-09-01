@@ -22,6 +22,7 @@ final class DocumentSession: ObservableObject {
     @Published var outlineEntries: [OutlineEntry] = []
     @Published private(set) var documentDetails: DocumentDetails?
     @Published private(set) var safetyGate: PDFSafetyGateReport?
+    @Published private(set) var safeShareReport: PDFSafeShareReport?
     @Published private(set) var recentDocuments: [URL] = []
     @Published private(set) var hasTextSelection = false
     @Published private(set) var isDirty = false
@@ -154,6 +155,7 @@ final class DocumentSession: ObservableObject {
         document = pdf
         fileURL = url
         safetyGate = PDFOperations.safetyGate(for: pdf)
+        safeShareReport = nil
         if safetyGate?.locked == true {
             navigatorMode = .info
             thumbnailsVisible = true
@@ -446,7 +448,16 @@ final class DocumentSession: ObservableObject {
 
     func markDirty() {
         isDirty = true
+        safeShareReport = nil
         DocumentRecoveryStore.shared.scheduleSnapshot(for: self)
+    }
+
+    func runSafeShareAudit() {
+        guard let document else {
+            safeShareReport = nil
+            return
+        }
+        safeShareReport = PDFOperations.safeShareAudit(for: document)
     }
 
     func markClean() {

@@ -9,6 +9,7 @@ CLI/.build/release/spdfv annotations document.pdf --pages all --pretty
 CLI/.build/release/spdfv forms intake.pdf --pretty
 CLI/.build/release/spdfv form-gate intake.pdf --pretty
 CLI/.build/release/spdfv safety-gate intake.pdf --pretty
+CLI/.build/release/spdfv safe-share review-copy.pdf --pretty
 CLI/.build/release/spdfv fill-form intake.pdf --values '{"full_name":"Ada Lovelace","approved":"true"}' --output completed.pdf
 CLI/.build/release/spdfv add-field intake.pdf --page 1 --type text --name reviewer --bounds 72,540,220,32 --output authored.pdf
 CLI/.build/release/spdfv rename-field authored.pdf --from reviewer --to review.owner --output renamed.pdf
@@ -34,6 +35,8 @@ Page specifications are one-based, accept comma-separated inclusive ranges, and 
 ## Interactive forms
 
 `safety-gate` reports encryption and lock state, all seven PDF access permissions, certificate-signature field names, and a pass, warning, or stop result. Signature fields are reported conservatively: SPDFV does not yet perform cryptographic signature validation. Run this preflight before an automated editing workflow when preserving document protections matters.
+
+`safe-share` audits common information that can unintentionally travel with a PDF: populated metadata fields, review annotations, filled form fields, file attachments, encryption, and certificate-signature fields. Its JSON report deliberately includes metadata keys and form-field names rather than their private values, and summarizes annotation contents without copying them to stdout. A locked document returns `stop` without inspecting its contents.
 
 `forms` reports every page widget, its canonical field name, type, value, bounds, choices, read-only status, and whether it has a normal appearance stream. `fill-form` accepts a JSON object of string values, keeps the output interactive, repairs genuinely orphaned PDFKit widgets during the write, and reopens the result to verify the canonical `/AcroForm/Fields` tree, widget values, and `/AP` `/N` appearances. Boolean button values accept `true`, `yes`, `on`, `checked`, or `1`.
 

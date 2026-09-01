@@ -15,6 +15,7 @@ The interface is deliberately compact. It is not a web view in a desktop shell, 
 - Reorder, rotate, duplicate, extract, append, crop, and delete pages
 - Inspect, fill, create, rename, and validate interactive form fields
 - Preflight document protections and unlock password-protected PDFs without retaining the password
+- Audit metadata, review annotations, filled forms, attachments, and signatures before sharing without copying private values into the report
 - Add an on-device searchable text layer to scanned pages with Vision OCR
 - Create permanent rasterized redactions and verify forbidden text is absent
 - Save and reuse deterministic JSON recipes

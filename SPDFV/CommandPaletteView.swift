@@ -191,6 +191,10 @@ struct CommandPaletteView: View {
                 item("nav-outline", "Show Contents", "Open the document outline", "NAVIGATE", .outline, shortcut: "⌘2", keywords: ["sidebar", "bookmarks"], action: { showNavigator(.outline) }),
                 item("nav-find", "Find in Document…", "Search the PDF text", "NAVIGATE", .search, shortcut: "⌘F", keywords: ["sidebar", "text"], action: { showNavigator(.search) }),
                 item("nav-info", "Show Document Info", "Review size, permissions, and metadata", "NAVIGATE", .info, shortcut: "⌘3", keywords: ["sidebar", "details"], action: { showNavigator(.info) }),
+                item("safe-share", "Run Safe Share Audit", "Check metadata, review marks, filled fields, attachments, and signatures", "DOCUMENT", .secureCopy, keywords: ["privacy", "sanitize", "inspect", "share"], action: {
+                    session.runSafeShareAudit()
+                    showNavigator(.info)
+                }),
                 item("nav-annotations", "Show Annotations", "Review every annotation in the PDF", "NAVIGATE", .annotations, shortcut: "⌘4", keywords: ["sidebar", "markup"], action: { showNavigator(.annotations) }),
                 item("previous-page", "Previous Page", "Move back one page", "NAVIGATE", .left, shortcut: "⌥←", enabled: session.pageIndex > 0, keywords: ["back"], action: { session.perform(.previousPage) }),
                 item("next-page", "Next Page", "Move forward one page", "NAVIGATE", .right, shortcut: "⌥→", enabled: session.pageIndex + 1 < session.pageCount, keywords: ["forward"], action: { session.perform(.nextPage) }),

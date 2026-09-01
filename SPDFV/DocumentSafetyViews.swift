@@ -67,6 +67,36 @@ struct DocumentInfoNavigator: View {
         ScrollView {
             if let details = session.documentDetails {
                 VStack(alignment: .leading, spacing: 22) {
+                    InspectorSection(title: "SAFE SHARE") {
+                        if let report = session.safeShareReport {
+                            InspectorRow(label: "Result", value: report.level.displayLabel)
+                            InspectorRow(
+                                label: "Text",
+                                value: "\(report.searchableTextPages)/\(report.pages) searchable pages"
+                            )
+                            InspectorRow(
+                                label: "Metadata",
+                                value: report.metadataKeys.isEmpty ? "None detected" : report.metadataKeys.joined(separator: ", ")
+                            )
+                            InspectorRow(label: "Marks", value: "\(report.reviewAnnotationCount) review annotations")
+                            InspectorRow(
+                                label: "Fields",
+                                value: report.filledFormFields.isEmpty ? "No filled fields" : report.filledFormFields.joined(separator: ", ")
+                            )
+                            InspectorRow(label: "Files", value: "\(report.fileAttachmentCount) attachments")
+                            ForEach(report.findings) { finding in
+                                InspectorRow(label: finding.category.displayLabel, value: finding.detail)
+                            }
+                            InspectorAction(title: "RUN AGAIN", action: session.runSafeShareAudit)
+                        } else {
+                            InspectorMessage(
+                                "Check information that may travel with this PDF. Private values are not copied into the report."
+                            )
+                            InspectorAction(title: "RUN SAFE SHARE AUDIT", action: session.runSafeShareAudit)
+                                .accessibilityIdentifier("safe-share.run")
+                        }
+                    }
+
                     if let gate = session.safetyGate {
                         InspectorSection(title: "SAFETY GATE") {
                             InspectorRow(label: "Result", value: gate.level.displayLabel)
@@ -129,6 +159,19 @@ private extension Bool {
     var permissionLabel: String { self ? "Allowed" : "Restricted" }
 }
 
+private extension PDFSafeShareCategory {
+    var displayLabel: String {
+        switch self {
+        case .access: "Access"
+        case .metadata: "Metadata"
+        case .review: "Review"
+        case .forms: "Forms"
+        case .attachments: "Files"
+        case .signatures: "Signing"
+        }
+    }
+}
+
 private struct InspectorSection<Content: View>: View {
     let title: String
     @ViewBuilder let content: Content
@@ -166,5 +209,38 @@ private struct InspectorRow: View {
         .overlay(alignment: .bottom) {
             Rectangle().fill(SPDFVTheme.divider).frame(height: 1)
         }
+    }
+}
+
+private struct InspectorMessage: View {
+    let message: String
+
+    init(_ message: String) {
+        self.message = message
+    }
+
+    var body: some View {
+        Text(message)
+            .font(.system(size: 10))
+            .foregroundStyle(SPDFVTheme.navigatorMuted)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(10)
+    }
+}
+
+private struct InspectorAction: View {
+    let title: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(title, action: action)
+            .buttonStyle(.plain)
+            .font(.system(size: 9, weight: .black, design: .monospaced))
+            .tracking(0.8)
+            .foregroundStyle(SPDFVTheme.paleCobalt)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 9)
     }
 }

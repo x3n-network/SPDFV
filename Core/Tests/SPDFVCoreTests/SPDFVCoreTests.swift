@@ -4,6 +4,80 @@ import XCTest
 @testable import SPDFVCore
 
 final class SPDFVCoreTests: XCTestCase {
+    func testSafeShareAuditReportsHazardsWithoutCopyingPrivateValues() throws {
+        let document = PDFDocument()
+        document.documentAttributes = [
+            PDFDocumentAttribute.titleAttribute: "Confidential acquisition",
+            PDFDocumentAttribute.authorAttribute: "Private Author"
+        ]
+        let page = PDFPage()
+        page.setBounds(CGRect(x: 0, y: 0, width: 612, height: 792), for: .mediaBox)
+
+        let note = PDFAnnotation(
+            bounds: CGRect(x: 40, y: 700, width: 180, height: 28),
+            forType: .freeText,
+            withProperties: nil
+        )
+        note.contents = "Do not include this comment"
+        note.userName = "Private Reviewer"
+        page.addAnnotation(note)
+
+        let attachment = PDFAnnotation(
+            bounds: CGRect(x: 40, y: 650, width: 24, height: 24),
+            forType: PDFAnnotationSubtype(rawValue: "FileAttachment"),
+            withProperties: nil
+        )
+        page.addAnnotation(attachment)
+        document.insert(page, at: 0)
+        _ = try PDFOperations.addFormField(
+            PDFFormFieldDraft(name: "account.owner", kind: .text, value: "Ada Lovelace"),
+            to: document,
+            pageIndex: 0,
+            bounds: CGRect(x: 72, y: 560, width: 200, height: 28)
+        )
+
+        let report = PDFOperations.safeShareAudit(for: document)
+
+        XCTAssertEqual(report.level, .warning)
+        XCTAssertEqual(report.metadataKeys, ["title", "author"])
+        XCTAssertEqual(report.reviewAnnotationCount, 1)
+        XCTAssertEqual(report.reviewAnnotationPages, [1])
+        XCTAssertEqual(report.annotationsWithContents, 1)
+        XCTAssertEqual(report.filledFormFields, ["account.owner"])
+        XCTAssertEqual(report.fileAttachmentCount, 1)
+        XCTAssertEqual(
+            report.findings.map(\.id),
+            ["document-metadata", "review-annotations", "filled-form-fields", "file-attachments"]
+        )
+
+        let json = String(decoding: try JSONEncoder().encode(report), as: UTF8.self)
+        XCTAssertFalse(json.contains("Confidential acquisition"))
+        XCTAssertFalse(json.contains("Private Author"))
+        XCTAssertFalse(json.contains("Private Reviewer"))
+        XCTAssertFalse(json.contains("Do not include this comment"))
+        XCTAssertFalse(json.contains("Ada Lovelace"))
+    }
+
+    func testSafeShareAuditStopsBeforeInspectingLockedContent() throws {
+        let source = makeDocument(pageNumbers: [1])
+        let options: [PDFDocumentWriteOption: Any] = [
+            .ownerPasswordOption: "owner-secret",
+            .userPasswordOption: "user-secret",
+            .accessPermissionsOption: NSNumber(value: 0)
+        ]
+        let encryptedData = try XCTUnwrap(source.dataRepresentation(options: options))
+        let locked = try XCTUnwrap(PDFDocument(data: encryptedData))
+
+        let report = PDFOperations.safeShareAudit(for: locked)
+
+        XCTAssertEqual(report.level, .stop)
+        XCTAssertTrue(report.locked)
+        XCTAssertEqual(report.findings.map(\.id), ["locked-document"])
+        XCTAssertTrue(report.metadataKeys.isEmpty)
+        XCTAssertTrue(report.filledFormFields.isEmpty)
+        XCTAssertEqual(report.reviewAnnotationCount, 0)
+    }
+
     func testSafetyGateReportsPlainLockedAndRestrictedDocuments() throws {
         let plain = makeDocument(pageNumbers: [1])
         let plainGate = PDFOperations.safetyGate(for: plain)

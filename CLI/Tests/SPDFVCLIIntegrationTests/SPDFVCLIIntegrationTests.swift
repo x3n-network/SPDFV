@@ -114,6 +114,34 @@ final class SPDFVCLIIntegrationTests: XCTestCase {
         }
     }
 
+    func testSafeShareEmitsPrivacyPreservingHazardReport() throws {
+        try withFixtureDirectory { directory in
+            let input = directory.appendingPathComponent("review-copy.pdf")
+            try makeCompatibilityFixture().write(to: input)
+
+            let result = try runCLI(["safe-share", input.path, "--pretty"])
+
+            XCTAssertEqual(result.status, 0, result.stderr)
+            XCTAssertTrue(result.stderr.isEmpty)
+            let wrapper = try jsonObject(result.stdout)
+            let report = try XCTUnwrap(wrapper["report"] as? [String: Any])
+            XCTAssertEqual(report["level"] as? String, "warning")
+            let metadataKeys = Set(try XCTUnwrap(report["metadataKeys"] as? [String]))
+            XCTAssertTrue(metadataKeys.isSuperset(of: ["title", "author"]))
+            XCTAssertTrue(metadataKeys.contains("producer"))
+            XCTAssertEqual(report["reviewAnnotationCount"] as? Int, 2)
+            XCTAssertEqual(report["reviewAnnotationPages"] as? [Int], [1, 2])
+            XCTAssertEqual(report["annotationsWithContents"] as? Int, 2)
+            XCTAssertEqual(
+                (report["findings"] as? [[String: Any]])?.compactMap { $0["id"] as? String },
+                ["document-metadata", "review-annotations"]
+            )
+            XCTAssertFalse(result.stdout.contains("SPDFV Compatibility Fixture"))
+            XCTAssertFalse(result.stdout.contains("SPDFV Tests"))
+            XCTAssertFalse(result.stdout.contains("Fixture page 1"))
+        }
+    }
+
     func testAnnotationsFiltersPagesAndEmitsCanonicalRecords() throws {
         try withFixtureDirectory { directory in
             let input = directory.appendingPathComponent("annotations.pdf")

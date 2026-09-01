@@ -240,6 +240,23 @@ final class DocumentSessionTests: XCTestCase {
         XCTAssertEqual(page.bounds(for: .cropBox), cropped)
     }
 
+    func testSafeShareAuditRunsOnDemandAndInvalidatesAfterEditing() throws {
+        let fixture = try makePDF(pageCount: 1, formFieldName: "account.owner")
+        defer { try? FileManager.default.removeItem(at: fixture) }
+
+        let session = DocumentSession()
+        session.open(fixture)
+        XCTAssertNil(session.safeShareReport)
+
+        session.runSafeShareAudit()
+        let report = try XCTUnwrap(session.safeShareReport)
+        XCTAssertFalse(report.locked)
+        XCTAssertEqual(report.pages, 1)
+
+        session.rotateCurrentPage(clockwise: true)
+        XCTAssertNil(session.safeShareReport)
+    }
+
     private func makePDF(
         pageCount: Int,
         formFieldName: String? = nil,
