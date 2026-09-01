@@ -39,6 +39,7 @@ struct RecipePanel: View {
             alignment: .top
         )
         .background(SPDFVTheme.navigator)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("recipe.panel")
         .animation(.snappy(duration: 0.22), value: isComposing)
         .alert("Remove recipe drawer?", isPresented: Binding(
@@ -198,6 +199,7 @@ struct RecipePanel: View {
                 proofDesk(recipe)
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("recipe.loaded")
         .onChange(of: recipe.steps.count) { _, count in
             selectedStep = min(selectedStep, max(0, count - 1))

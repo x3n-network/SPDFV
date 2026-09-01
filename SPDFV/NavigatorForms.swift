@@ -28,6 +28,8 @@ struct FormsNavigator: View {
                             .background(workbench == mode ? SPDFVTheme.cobalt : Color.clear)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("forms.workbench.\(mode.rawValue)")
+                    .accessibilityValue(workbench == mode ? "Selected" : "Not selected")
                 }
             }
             .background(SPDFVTheme.navigatorInset)

@@ -56,9 +56,12 @@ struct NavigatorSidebar: View {
                             Rectangle().fill(SPDFVTheme.cobalt).frame(height: 2)
                         }
                     }
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(mode.label)
                 .accessibilityIdentifier("navigator.\(mode.rawValue)")
+                .accessibilityValue(session.navigatorMode == mode ? "Selected" : "Not selected")
             }
         }
     }

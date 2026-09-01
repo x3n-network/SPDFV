@@ -36,6 +36,7 @@ struct ContentView: View {
             }
         }
         .frame(minWidth: 820, minHeight: 560)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("document.window")
         .background(SPDFVTheme.canvas)
         .background(
@@ -272,6 +273,8 @@ private struct ReaderView: View {
                         LockedDocumentView(session: session, openDocument: openDocument)
                     } else {
                         PDFWorkspace(session: session)
+                            .accessibilityElement(children: .contain)
+                            .accessibilityIdentifier("document.pdf")
                         PageSpine(session: session)
                     }
                 }

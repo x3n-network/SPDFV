@@ -56,7 +56,7 @@ final class SPDFVUITests: XCTestCase {
         let app = launchApplication(documentURL: fixture)
 
         XCTAssertTrue(app.descendants(matching: .any)["document.pdf"].waitForExistence(timeout: 5))
-        app.buttons["navigator.info"].click()
+        selectButton(app.buttons["navigator.info"])
 
         let doctor = app.buttons["doctor.run"]
         XCTAssertTrue(doctor.waitForExistence(timeout: 2))
@@ -77,7 +77,8 @@ final class SPDFVUITests: XCTestCase {
         let app = launchApplication(documentURL: fixture)
 
         XCTAssertTrue(app.descendants(matching: .any)["document.pdf"].waitForExistence(timeout: 5))
-        app.buttons["navigator.forms"].click()
+        selectButton(app.buttons["navigator.forms"])
+        selectButton(app.buttons["forms.workbench.data"])
 
         XCTAssertTrue(app.buttons["form-data.import"].waitForExistence(timeout: 2))
         XCTAssertTrue(app.buttons["form-data.export"].exists)
@@ -107,6 +108,14 @@ final class SPDFVUITests: XCTestCase {
         }
         app.launch()
         return app
+    }
+
+    private func selectButton(_ button: XCUIElement) {
+        XCTAssertTrue(button.waitForExistence(timeout: 2))
+        button.click()
+        let selected = NSPredicate(format: "value == %@", "Selected")
+        expectation(for: selected, evaluatedWith: button)
+        waitForExpectations(timeout: 2)
     }
 
     private func makePDF(password: String? = nil, withTextField: Bool = false) throws -> URL {

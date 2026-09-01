@@ -334,6 +334,7 @@ struct EmptyDocumentView: View {
         .frame(width: 510, height: 350, alignment: .leading)
         .background(SPDFVTheme.folio)
         .shadow(color: .black.opacity(0.28), radius: 32, y: 16)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("document.empty")
     }
 }
