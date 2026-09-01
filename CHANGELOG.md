@@ -5,7 +5,7 @@
 - Added a Document Safety Gate for encryption, permissions, and certificate-signature fields, with in-app password unlocking and machine-readable CLI output
 - Enforced PDF access permissions across page editing, annotations, forms, OCR, redaction, recipes, and CLI operations
 - Split Recipe Press, document safety UI, navigation and annotation models, page operations, OCR, redaction, recipe automation, forms, and edit history out of the largest app source files to make future changes easier to isolate
-- Added native app tests for page selection, page-edit undo/redo, annotations, forms, and recipe composition state transitions
+- Added native app tests for document lifecycle, encrypted unlock, save-as, page selection and geometry, edit history, annotations, forms, and recipe composition state transitions
 - Added stable accessibility identifiers and UI automation for empty, document, automation, and encrypted-document flows
 
 ## 0.1.2 - 2026-08-31

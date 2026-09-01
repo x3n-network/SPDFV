@@ -150,7 +150,101 @@ final class DocumentSessionTests: XCTestCase {
         XCTAssertEqual(widget.widgetStringValue, "Ada")
     }
 
-    private func makePDF(pageCount: Int, formFieldName: String? = nil) throws -> URL {
+    func testUnsavedDocumentDefersReplacementUntilResolved() throws {
+        let first = try makePDF(pageCount: 1)
+        let second = try makePDF(pageCount: 2)
+        defer {
+            try? FileManager.default.removeItem(at: first)
+            try? FileManager.default.removeItem(at: second)
+        }
+
+        let session = DocumentSession()
+        session.open(first)
+        session.rotateCurrentPage(clockwise: true)
+
+        session.open(second)
+        XCTAssertEqual(session.fileURL, first)
+        XCTAssertEqual(session.pendingOpenURL, second)
+        XCTAssertTrue(session.isDirty)
+
+        session.cancelPendingOpen()
+        XCTAssertNil(session.pendingOpenURL)
+        XCTAssertEqual(session.fileURL, first)
+
+        session.open(second)
+        session.resolvePendingOpen(savingChanges: false)
+        XCTAssertEqual(session.fileURL, second)
+        XCTAssertEqual(session.pageCount, 2)
+        XCTAssertFalse(session.isDirty)
+        XCTAssertNil(session.pendingOpenURL)
+    }
+
+    func testEncryptedDocumentRejectsWrongPasswordAndConfiguresAfterUnlock() throws {
+        let fixture = try makePDF(pageCount: 2, password: "reader-secret")
+        defer { try? FileManager.default.removeItem(at: fixture) }
+
+        let session = DocumentSession()
+        session.open(fixture)
+
+        XCTAssertEqual(session.safetyGate?.locked, true)
+        XCTAssertFalse(session.unlockDocument(with: "wrong-secret"))
+        XCTAssertEqual(session.safetyGate?.locked, true)
+
+        XCTAssertTrue(session.unlockDocument(with: "reader-secret"))
+        XCTAssertEqual(session.safetyGate?.locked, false)
+        XCTAssertEqual(session.pageCount, 2)
+        XCTAssertEqual(session.selectedPageIndices, [0])
+        XCTAssertFalse(session.isDirty)
+    }
+
+    func testSaveAsReopensEditedStateAndClearsHistory() throws {
+        let fixture = try makePDF(pageCount: 1)
+        let destination = temporaryPDFURL()
+        defer {
+            try? FileManager.default.removeItem(at: fixture)
+            try? FileManager.default.removeItem(at: destination)
+        }
+
+        let session = DocumentSession()
+        session.open(fixture)
+        session.rotateCurrentPage(clockwise: true)
+        XCTAssertTrue(session.canUndoEdit)
+
+        XCTAssertTrue(session.save(to: destination))
+        XCTAssertEqual(session.fileURL, destination)
+        XCTAssertFalse(session.isDirty)
+        XCTAssertFalse(session.canUndoEdit)
+        XCTAssertFalse(session.canRedoEdit)
+        XCTAssertEqual(PDFDocument(url: destination)?.page(at: 0)?.rotation, 90)
+    }
+
+    func testCropUndoAndRedoRestorePageGeometry() throws {
+        let fixture = try makePDF(pageCount: 1)
+        defer { try? FileManager.default.removeItem(at: fixture) }
+
+        let session = DocumentSession()
+        session.open(fixture)
+        let page = try XCTUnwrap(session.document?.page(at: 0))
+        let original = page.bounds(for: .cropBox)
+
+        session.applyCropInsets(PageCropInsets(top: 12, right: 8, bottom: 6, left: 4))
+        let cropped = page.bounds(for: .cropBox)
+        XCTAssertEqual(cropped.width, original.width - 12, accuracy: 0.01)
+        XCTAssertEqual(cropped.height, original.height - 18, accuracy: 0.01)
+        XCTAssertEqual(session.undoActionName, "Crop Page")
+
+        session.undoLastEdit()
+        XCTAssertEqual(page.bounds(for: .cropBox), original)
+
+        session.redoLastEdit()
+        XCTAssertEqual(page.bounds(for: .cropBox), cropped)
+    }
+
+    private func makePDF(
+        pageCount: Int,
+        formFieldName: String? = nil,
+        password: String? = nil
+    ) throws -> URL {
         let document = PDFDocument()
         for index in 0..<pageCount {
             let image = NSImage(size: NSSize(width: 180, height: 240))
@@ -177,12 +271,22 @@ final class DocumentSessionTests: XCTestCase {
             document.insert(page, at: index)
         }
 
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("spdfv-session-tests-\(UUID().uuidString)")
-            .appendingPathExtension("pdf")
-        guard document.write(to: url) else {
+        let url = temporaryPDFURL()
+        if let password {
+            let data = try XCTUnwrap(document.dataRepresentation(options: [
+                PDFDocumentWriteOption.ownerPasswordOption: "owner-secret",
+                PDFDocumentWriteOption.userPasswordOption: password
+            ]))
+            try data.write(to: url, options: Data.WritingOptions.atomic)
+        } else if !document.write(to: url) {
             throw CocoaError(.fileWriteUnknown)
         }
         return url
+    }
+
+    private func temporaryPDFURL() -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("spdfv-session-tests-\(UUID().uuidString)")
+            .appendingPathExtension("pdf")
     }
 }

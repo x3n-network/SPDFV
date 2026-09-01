@@ -20,7 +20,7 @@ SPDFV is a macOS application with a shared core and CLI. Changes should preserve
 
 ## Compatibility tests
 
-App tests use small generated PDFs to verify `DocumentSession` state transitions without checking in document fixtures. Add a focused state assertion when changing page selection, edit history, or recipe composition behavior.
+App tests use small generated PDFs to verify `DocumentSession` state transitions without checking in document fixtures. Add a focused state assertion when changing document opening, unlocking, saving, page selection, edit history, or recipe composition behavior.
 
 UI tests launch deterministic generated PDFs through the debug-only `SPDFV_UI_TEST_PDF` environment variable. Keep stable `document.*`, `workspace.*`, `navigator.*`, `page.*`, and `automation.*` accessibility identifiers on critical controls. Running UI automation locally requires Accessibility permission for the Xcode test runner.
 
