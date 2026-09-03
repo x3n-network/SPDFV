@@ -34,7 +34,7 @@ struct FormFieldRow: View {
                     Text(String(format: "%02d", field.page))
                         .font(.system(size: 9, weight: .black, design: .monospaced))
                         .foregroundStyle(SPDFVTheme.paleCobalt)
-                    Text(field.name)
+                    Text(field.displayName)
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(SPDFVTheme.navigatorText)
                         .lineLimit(1)
@@ -46,6 +46,8 @@ struct FormFieldRow: View {
                 }
             }
             .buttonStyle(.plain)
+            .help(field.name == field.displayName ? field.displayName : "\(field.displayName) — PDF field: \(field.name)")
+            .accessibilityLabel("\(field.displayName), page \(field.page), \(field.kind.rawValue) field")
 
             editor
 
@@ -172,7 +174,7 @@ struct FormFieldRow: View {
             }
             .buttonStyle(.plain)
         } else if field.kind == .choice, !field.choices.isEmpty {
-            Picker(field.name, selection: $value) {
+            Picker(field.displayName, selection: $value) {
                 ForEach(field.choices, id: \.self) { Text($0).tag($0) }
             }
             .labelsHidden()

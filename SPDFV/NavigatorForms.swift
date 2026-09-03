@@ -36,7 +36,7 @@ struct FormsNavigator: View {
             .overlay(alignment: .bottom) { Rectangle().fill(SPDFVTheme.divider).frame(height: 1) }
 
             if workbench == .fill, let gate = session.formGate {
-                FormGatePlate(gate: gate)
+                FormGatePlate(gate: gate, fields: session.formFields)
             } else if workbench == .build {
                 FieldDraftingPlate(
                     session: session,
@@ -99,7 +99,7 @@ struct FormsNavigator: View {
             }
             Button("Cancel", role: .cancel) { pendingDeleteField = nil }
         } message: {
-            Text("The interactive field “\(pendingDeleteField?.name ?? "")” will be removed. You can undo this edit until the document is saved.")
+            Text("The interactive field “\(pendingDeleteField?.displayName ?? "")” will be removed. You can undo this edit until the document is saved.")
         }
     }
 
@@ -165,6 +165,13 @@ struct FormsNavigator: View {
 
 private struct FormGatePlate: View {
     let gate: PDFFormGateReport
+    let fields: [PDFFormFieldReport]
+
+    private var displayNames: [String: String] {
+        fields.reduce(into: [:]) { names, field in
+            names[field.name] = field.displayName
+        }
+    }
 
     private var gateColor: Color {
         switch gate.level {
@@ -199,7 +206,7 @@ private struct FormGatePlate: View {
                         Text(issue.title.uppercased())
                             .font(.system(size: 8, weight: .black, design: .monospaced))
                             .foregroundStyle(issue.level == .stop ? SPDFVTheme.redaction : gateColor)
-                        Text(issue.fields.prefix(3).joined(separator: ", "))
+                        Text(issue.fields.prefix(3).map(friendlyName).joined(separator: ", "))
                             .font(.system(size: 8, design: .monospaced))
                             .foregroundStyle(SPDFVTheme.navigatorMuted)
                             .lineLimit(2)
@@ -211,6 +218,10 @@ private struct FormGatePlate: View {
         .background(SPDFVTheme.navigatorInset)
         .overlay(alignment: .leading) { Rectangle().fill(gateColor).frame(width: 3) }
         .overlay(alignment: .bottom) { Rectangle().fill(SPDFVTheme.divider).frame(height: 1) }
+    }
+
+    private func friendlyName(_ name: String) -> String {
+        displayNames[name] ?? PDFFormFieldNameFormatter.displayName(for: name)
     }
 }
 

@@ -43,7 +43,10 @@ struct NavigatorSidebar: View {
                             .font(.system(size: 12, weight: .semibold))
                         Text(mode.label.uppercased())
                             .font(.system(size: 8, weight: .bold, design: .monospaced))
-                            .tracking(0.8)
+                            .tracking(0.55)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
+                            .allowsTightening(true)
                     }
                     .foregroundStyle(
                         session.navigatorMode == mode

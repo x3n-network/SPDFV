@@ -387,6 +387,30 @@ final class SPDFVCoreTests: XCTestCase {
         XCTAssertTrue(result.report.isInteractive)
     }
 
+    func testFormFieldDisplayNamesHidePDFImplementationPaths() {
+        XCTAssertEqual(
+            PDFFormFieldNameFormatter.displayName(
+                for: "topmostSubform[0].Page1[0].Address_ReadOrder[0]",
+                kind: .text,
+                page: 1
+            ),
+            "Address"
+        )
+        XCTAssertEqual(
+            PDFFormFieldNameFormatter.displayName(for: "applicant.contactPhone", kind: .text, page: 2),
+            "Applicant · Contact Phone"
+        )
+        XCTAssertEqual(
+            PDFFormFieldNameFormatter.displayName(
+                for: "topmostSubform[0].Page1[0].f1_01[0]",
+                kind: .text,
+                page: 1
+            ),
+            "Text field · Page 1"
+        )
+        XCTAssertEqual(PDFFormFieldNameFormatter.displayName(for: "full_name"), "Full Name")
+    }
+
     func testFormDataExportValidationAndAtomicApply() throws {
         let document = makeDocument(pageNumbers: [1])
         _ = try PDFOperations.addFormField(

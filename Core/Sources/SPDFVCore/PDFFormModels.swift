@@ -21,6 +21,12 @@ public struct PDFFormFieldReport: Codable, Equatable, Sendable, Identifiable {
     public let readOnly: Bool
     public let hasNormalAppearance: Bool
 
+    /// A concise label for people, while `name` remains the exact AcroForm key
+    /// used for filling, exporting, and round-trip verification.
+    public var displayName: String {
+        PDFFormFieldNameFormatter.displayName(for: name, kind: kind, page: page)
+    }
+
     public init(
         id: String,
         name: String,
@@ -41,6 +47,81 @@ public struct PDFFormFieldReport: Codable, Equatable, Sendable, Identifiable {
         self.choices = choices
         self.readOnly = readOnly
         self.hasNormalAppearance = hasNormalAppearance
+    }
+}
+
+public enum PDFFormFieldNameFormatter {
+    public static func displayName(
+        for name: String,
+        kind: PDFFormFieldKind? = nil,
+        page: Int? = nil
+    ) -> String {
+        let segments = name
+            .components(separatedBy: CharacterSet(charactersIn: "./"))
+            .compactMap(normalize)
+
+        if !segments.isEmpty {
+            return segments.suffix(2).joined(separator: " · ")
+        }
+
+        let field = kind.map(kindLabel) ?? "Field"
+        return page.map { "\(field) · Page \($0)" } ?? field
+    }
+
+    private static func normalize(_ rawSegment: String) -> String? {
+        var segment = rawSegment.trimmingCharacters(in: .whitespacesAndNewlines)
+        segment = segment.replacingOccurrences(
+            of: #"\[\d+\]"#,
+            with: "",
+            options: .regularExpression
+        )
+        segment = segment.replacingOccurrences(
+            of: #"(?i)[_\s-]*read[_\s-]*order.*$"#,
+            with: "",
+            options: .regularExpression
+        )
+        segment = segment.trimmingCharacters(in: CharacterSet(charactersIn: "_#- "))
+
+        let collapsed = segment
+            .lowercased()
+            .replacingOccurrences(of: #"[^a-z0-9]"#, with: "", options: .regularExpression)
+        let generic = collapsed == "topmostsubform"
+            || collapsed == "subform"
+            || collapsed == "form"
+            || collapsed.range(of: #"^(?:page|p)\d+$"#, options: .regularExpression) != nil
+        let opaqueID = collapsed.range(of: #"^[a-z]{0,2}\d+$"#, options: .regularExpression) != nil
+        guard !segment.isEmpty, !generic, !opaqueID else { return nil }
+
+        segment = segment.replacingOccurrences(of: "_", with: " ")
+        segment = segment.replacingOccurrences(of: "-", with: " ")
+        segment = segment.replacingOccurrences(
+            of: #"([a-z0-9])([A-Z])"#,
+            with: "$1 $2",
+            options: .regularExpression
+        )
+        segment = segment.replacingOccurrences(
+            of: #"([A-Za-z])(\d)"#,
+            with: "$1 $2",
+            options: .regularExpression
+        )
+        segment = segment.replacingOccurrences(
+            of: #"\s+"#,
+            with: " ",
+            options: .regularExpression
+        )
+        return segment.capitalized
+    }
+
+    private static func kindLabel(_ kind: PDFFormFieldKind) -> String {
+        switch kind {
+        case .text: "Text field"
+        case .checkbox: "Checkbox"
+        case .radio: "Radio button"
+        case .pushButton: "Button"
+        case .choice: "Choice field"
+        case .signature: "Signature"
+        case .unknown: "Field"
+        }
     }
 }
 
