@@ -6,6 +6,15 @@
         <description>Signed updates for SPDFV.</description>
         <language>en</language>
         <item>
+            <title>0.1.4</title>
+            <pubDate>Thu, 03 Sep 2026 09:22:43 -0400</pubDate>
+            <link>https://github.com/x3n-network/SPDFV/releases/tag/v0.1.4</link>
+            <sparkle:version>5</sparkle:version>
+            <sparkle:shortVersionString>0.1.4</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/x3n-network/SPDFV/releases/download/v0.1.4/SPDFV-0.1.4.dmg" length="8550268" type="application/octet-stream" sparkle:edSignature="cTpE6Z3T/OV81kEHvw0sWVG/imBAVcT4SeHtVhms93scgaPEl2fhDifgosd3rzWdTyv8mKtfJg3+zc+Bx7H3Cw=="/>
+        </item>
+        <item>
             <title>0.1.3</title>
             <pubDate>Tue, 01 Sep 2026 13:32:49 -0400</pubDate>
             <link>https://github.com/x3n-network/SPDFV/releases/tag/v0.1.3</link>
@@ -22,15 +31,6 @@
             <sparkle:shortVersionString>0.1.2</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
             <enclosure url="https://github.com/x3n-network/SPDFV/releases/download/v0.1.2/SPDFV-0.1.2.dmg" length="7309516" type="application/octet-stream" sparkle:edSignature="54RjryXyxFnoZti+9cR5zabsOKwlOLPv0DBgjvrhDT3Lxjgjq0nE/Wq8ZBQbQ8dPGdqnJGNaQPPpDjtkgOnNCg=="/>
-        </item>
-        <item>
-            <title>0.1.1</title>
-            <pubDate>Mon, 31 Aug 2026 15:14:44 -0400</pubDate>
-            <link>https://github.com/x3n-network/SPDFV/releases/tag/v0.1.1</link>
-            <sparkle:version>2</sparkle:version>
-            <sparkle:shortVersionString>0.1.1</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/x3n-network/SPDFV/releases/download/v0.1.1/SPDFV-0.1.1.dmg" sparkle:edSignature="RjMZbPDORSPTx3ecS3IKobq8+7e6b/0KRW4Ioj3YMBdQF4KU3Nb0TLXoCN0cJP520rd+FSRq/nHaJpudIUd+Dw==" length="6275812" type="application/octet-stream"/>
         </item>
     </channel>
 </rss>
