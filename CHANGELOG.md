@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.4 - 2026-09-03
+
+- Replaced internal AcroForm/XFA field paths with readable form labels while preserving exact PDF keys, and kept the Contents navigator label legible in narrow sidebars
+
 ## 0.1.3 - 2026-09-01
 
 - Added cryptographic PDF signature verification for detached CMS signatures with ByteRange integrity, certificate details, macOS trust evaluation, authenticated timestamps, later-revision detection, and edit invalidation warnings
