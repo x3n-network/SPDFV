@@ -23,6 +23,7 @@ if [[ ! "$current_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ || ! "$
     exit 70
 fi
 build_number="${BUILD_NUMBER:-$((current_build + 1))}"
+allow_current_version="${ALLOW_CURRENT_VERSION:-0}"
 output_dir="${OUTPUT_DIR:-$project_root/dist}"
 archive_path="$output_dir/SPDFV.xcarchive"
 export_path="$output_dir/export"
@@ -52,7 +53,16 @@ if [[ ! "$build_number" =~ ^[1-9][0-9]*$ ]]; then
     echo "BUILD_NUMBER must be a positive integer: $build_number"
     exit 64
 fi
-if (( build_number <= current_build )); then
+if [[ "$allow_current_version" != "0" && "$allow_current_version" != "1" ]]; then
+    echo "ALLOW_CURRENT_VERSION must be 0 or 1: $allow_current_version"
+    exit 64
+fi
+if (( allow_current_version == 1 )); then
+    if [[ "$version" != "$current_version" || "$build_number" != "$current_build" ]]; then
+        echo "ALLOW_CURRENT_VERSION=1 requires release version and build to match the project: $current_version ($current_build)."
+        exit 64
+    fi
+elif (( build_number <= current_build )); then
     echo "Build number $build_number must be greater than project build $current_build."
     exit 64
 fi
@@ -63,7 +73,7 @@ IFS=. read -r version_major version_minor version_patch <<< "$version_base"
 IFS=. read -r current_major current_minor current_patch <<< "$current_base"
 version_key=$((version_major * 100000000 + version_minor * 10000 + version_patch))
 current_key=$((current_major * 100000000 + current_minor * 10000 + current_patch))
-if (( version_key <= current_key )); then
+if (( allow_current_version == 0 && version_key <= current_key )); then
     echo "Release version $version must be greater than project version $current_version."
     exit 64
 fi
