@@ -109,7 +109,7 @@ final class DocumentSession: ObservableObject {
     }
 
     var displayName: String {
-        fileURL?.deletingPathExtension().lastPathComponent ?? "SPDFV"
+        fileURL?.deletingPathExtension().lastPathComponent ?? "Untitled"
     }
 
     var undoMenuTitle: String {
@@ -132,6 +132,14 @@ final class DocumentSession: ObservableObject {
         }
 
         load(url)
+    }
+
+    func createBlankDocument() {
+        releaseSecurityScopedResource()
+        let pdf = PDFDocument()
+        pdf.insert(PDFPage(), at: 0)
+        configureLoadedDocument(pdf, url: nil)
+        markDirty()
     }
 
     func resolvePendingOpen(savingChanges: Bool) {
@@ -172,7 +180,7 @@ final class DocumentSession: ObservableObject {
         configureLoadedDocument(pdf, url: url)
     }
 
-    private func configureLoadedDocument(_ pdf: PDFDocument, url: URL) {
+    private func configureLoadedDocument(_ pdf: PDFDocument, url: URL?) {
         document = pdf
         fileURL = url
         safetyGate = PDFOperations.safetyGate(for: pdf)
@@ -194,7 +202,7 @@ final class DocumentSession: ObservableObject {
             thumbnailsVisible = true
         }
         pageCount = pdf.pageCount
-        let restoredPage = restoredPageIndex(for: url, pageCount: pdf.pageCount)
+        let restoredPage = url.map { restoredPageIndex(for: $0, pageCount: pdf.pageCount) } ?? 0
         pageIndex = restoredPage
         selectedPageIndices = pdf.pageCount > 0 ? [restoredPage] : []
         pageSelectionAnchor = pdf.pageCount > 0 ? restoredPage : nil
@@ -234,8 +242,10 @@ final class DocumentSession: ObservableObject {
         markClean()
         hasTextSelection = false
         errorMessage = nil
-        NSDocumentController.shared.noteNewRecentDocumentURL(url)
-        refreshRecentDocuments()
+        if let url {
+            NSDocumentController.shared.noteNewRecentDocumentURL(url)
+            refreshRecentDocuments()
+        }
         if restoredPage > 0 {
             perform(.goToPage(restoredPage))
         }
@@ -247,19 +257,29 @@ final class DocumentSession: ObservableObject {
 
     func updatePage(index: Int) {
         let updatedIndex = max(0, min(index, max(0, pageCount - 1)))
-        pageIndex = updatedIndex
+        if pageIndex != updatedIndex {
+            pageIndex = updatedIndex
+        }
         if selectedPageIndices.count <= 1 {
-            selectedPageIndices = pageCount > 0 ? [updatedIndex] : []
-            pageSelectionAnchor = pageCount > 0 ? updatedIndex : nil
+            let updatedSelection: Set<Int> = pageCount > 0 ? [updatedIndex] : []
+            if selectedPageIndices != updatedSelection {
+                selectedPageIndices = updatedSelection
+            }
+            let updatedAnchor = pageCount > 0 ? updatedIndex : nil
+            if pageSelectionAnchor != updatedAnchor {
+                pageSelectionAnchor = updatedAnchor
+            }
         }
         savePagePosition(updatedIndex)
     }
 
     func updateScale(_ scale: CGFloat) {
+        guard scaleFactor != scale else { return }
         scaleFactor = scale
     }
 
     func updateSelection(hasText: Bool) {
+        guard hasTextSelection != hasText else { return }
         hasTextSelection = hasText
     }
 
@@ -538,16 +558,21 @@ final class DocumentSession: ObservableObject {
         return entries
     }
 
-    private static func makeDocumentDetails(document: PDFDocument, url: URL) -> DocumentDetails {
+    private static func makeDocumentDetails(document: PDFDocument, url: URL?) -> DocumentDetails {
         let attributes = document.documentAttributes ?? [:]
-        let fileSize = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize
+        let fileSize: Int?
+        if let url {
+            fileSize = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize
+        } else {
+            fileSize = nil
+        }
         let pageBounds = document.page(at: 0)?.bounds(for: .cropBox) ?? .zero
 
         return DocumentDetails(
-            fileName: url.lastPathComponent,
+            fileName: url?.lastPathComponent ?? "Untitled.pdf",
             fileSize: fileSize.map {
                 ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .file)
-            } ?? "Unknown",
+            } ?? (url == nil ? "Unsaved" : "Unknown"),
             pageSize: pageBounds.isEmpty
                 ? "Unknown"
                 : String(format: "%.1f × %.1f in", pageBounds.width / 72, pageBounds.height / 72),

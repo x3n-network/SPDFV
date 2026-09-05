@@ -2,6 +2,11 @@ import SwiftUI
 
 struct NavigatorSidebar: View {
     @ObservedObject var session: DocumentSession
+    let edition: SPDFVEdition
+
+    private var availableModes: [NavigatorMode] {
+        edition.navigatorModes
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -14,7 +19,7 @@ struct NavigatorSidebar: View {
             Group {
                 switch session.navigatorMode {
                 case .pages:
-                    PagesNavigator(session: session)
+                    PagesNavigator(session: session, showsEditingControls: true)
                 case .outline:
                     OutlineNavigator(session: session)
                 case .search:
@@ -34,7 +39,7 @@ struct NavigatorSidebar: View {
 
     private var modeSwitcher: some View {
         HStack(spacing: 0) {
-            ForEach(NavigatorMode.allCases) { mode in
+            ForEach(availableModes) { mode in
                 Button {
                     session.navigatorMode = mode
                 } label: {

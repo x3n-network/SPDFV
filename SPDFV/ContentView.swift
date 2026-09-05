@@ -3,18 +3,56 @@ import UniformTypeIdentifiers
 import PDFKit
 import SPDFVCore
 
+enum SPDFVEdition {
+    case direct
+    case reader
+
+    var displayName: String {
+        switch self {
+        case .direct: "SPDFV"
+        case .reader: "Simple PDF Viewer"
+        }
+    }
+
+    var workspaceModes: [DocumentWorkspaceMode] {
+        switch self {
+        case .direct: DocumentWorkspaceMode.allCases
+        case .reader: DocumentWorkspaceMode.allCases
+        }
+    }
+
+    func workspaceLabel(for mode: DocumentWorkspaceMode) -> String {
+        if self == .reader, mode == .automate { return "Tools" }
+        return mode.label
+    }
+
+    var navigatorModes: [NavigatorMode] {
+        NavigatorMode.allCases
+    }
+}
+
 struct ContentView: View {
     @StateObject private var session = DocumentSession()
     @State private var isTargeted = false
     @State private var didOpenInitialURL = false
+    @State private var didCreateInitialDocument = false
+    @State private var didApplyDebugCaptureState = false
     @State private var commandPalettePresented = false
     @State private var workspaceMode = DocumentWorkspaceMode.read
     @AppStorage("themePreference") private var themePreferenceRaw = ThemePreference.system.rawValue
     @Environment(\.openWindow) private var openWindow
     private let initialURL: URL?
+    private let createsBlankDocument: Bool
+    private let edition: SPDFVEdition
 
-    init(initialURL: URL? = nil) {
+    init(
+        initialURL: URL? = nil,
+        createsBlankDocument: Bool = false,
+        edition: SPDFVEdition = .direct
+    ) {
         self.initialURL = initialURL
+        self.createsBlankDocument = createsBlankDocument
+        self.edition = edition
     }
 
     var body: some View {
@@ -31,7 +69,8 @@ struct ContentView: View {
                     themePreference: themePreference,
                     workspaceMode: $workspaceMode,
                     openDocument: openDocument,
-                    saveAs: saveDocumentAs
+                    saveAs: saveDocumentAs,
+                    edition: edition
                 )
             }
         }
@@ -43,7 +82,7 @@ struct ContentView: View {
             WindowCloseGuard(session: session, viewerActions: viewerActions)
                 .frame(width: 0, height: 0)
         )
-        .navigationTitle(session.document == nil ? "SPDFV" : session.displayName)
+        .navigationTitle(session.document == nil ? edition.displayName : session.displayName)
         .dropDestination(for: URL.self, action: handleDrop, isTargeted: { isTargeted = $0 })
         .overlay {
             if isTargeted {
@@ -78,16 +117,24 @@ struct ContentView: View {
                 openActivityCenter: { openWindow(id: "processing-queue") }
             )
         }
-        .onOpenURL { session.open($0) }
+        .onOpenURL { url in
+            session.open(url)
+            applyDebugCaptureStateIfNeeded()
+        }
         .preferredColorScheme(themePreference.wrappedValue.colorScheme)
         .focusedSceneValue(\.viewerActions, viewerActions)
         .onAppear {
             CloseProtectionCenter.shared.register(session)
-            DocumentWindowManager.shared.register(session)
+            DocumentWindowManager.shared.register(session, edition: edition)
             applyApplicationAppearance(themePreference.wrappedValue)
             if !didOpenInitialURL, let initialURL {
                 didOpenInitialURL = true
                 session.open(initialURL)
+                applyDebugCaptureStateIfNeeded()
+            } else if createsBlankDocument, !didCreateInitialDocument, session.document == nil {
+                didCreateInitialDocument = true
+                session.createBlankDocument()
+                applyDebugCaptureStateIfNeeded()
             }
         }
         .onDisappear {
@@ -101,6 +148,48 @@ struct ContentView: View {
         }
     }
 
+    private func applyDebugCaptureStateIfNeeded() {
+#if DEBUG
+        guard !didApplyDebugCaptureState else { return }
+        didApplyDebugCaptureState = true
+
+        let environment = ProcessInfo.processInfo.environment
+        let defaults = UserDefaults.standard
+        func captureValue(_ key: String) -> String? {
+            environment[key] ?? defaults.string(forKey: key)
+        }
+
+        if captureValue("SPDFV_UI_TEST_WINDOW_SIZE") == "app-store" {
+            DispatchQueue.main.async {
+                NSApp.keyWindow?.setContentSize(NSSize(width: 1080, height: 760))
+            }
+        }
+
+        if let rawWorkspace = captureValue("SPDFV_UI_TEST_WORKSPACE"),
+           let requestedWorkspace = DocumentWorkspaceMode(rawValue: rawWorkspace),
+           edition.workspaceModes.contains(requestedWorkspace) {
+            workspaceMode = requestedWorkspace
+        }
+        if let rawNavigator = captureValue("SPDFV_UI_TEST_NAVIGATOR"),
+           let requestedNavigator = NavigatorMode(rawValue: rawNavigator),
+           edition.navigatorModes.contains(requestedNavigator) {
+            session.thumbnailsVisible = true
+            session.navigatorMode = requestedNavigator
+        }
+        if let searchText = captureValue("SPDFV_UI_TEST_SEARCH"), !searchText.isEmpty {
+            session.thumbnailsVisible = true
+            session.navigatorMode = .search
+            session.searchText = searchText
+            session.runSearch()
+        }
+        if let rawPage = captureValue("SPDFV_UI_TEST_PAGE"),
+           let oneBasedPage = Int(rawPage),
+           oneBasedPage > 0 {
+            session.goToPage(oneBasedPage - 1)
+        }
+#endif
+    }
+
     private var themePreference: Binding<ThemePreference> {
         Binding(
             get: { ThemePreference(rawValue: themePreferenceRaw) ?? .system },
@@ -110,13 +199,20 @@ struct ContentView: View {
 
     private var viewerActions: ViewerActions {
         ViewerActions(
+            newDocument: newDocument,
             openDocument: openDocument,
             toggleNavigator: { session.thumbnailsVisible.toggle() },
             showPages: { showNavigator(.pages) },
             showOutline: { showNavigator(.outline) },
             showSearch: { showNavigator(.search) },
+            showForms: { showNavigator(.forms) },
             showAnnotations: { showNavigator(.annotations) },
             showInfo: { showNavigator(.info) },
+            showPDFTools: { workspaceMode = .automate },
+            runDocumentDoctor: {
+                showNavigator(.info)
+                session.runDocumentDoctor()
+            },
             compareDocument: {
                 showNavigator(.info)
                 session.compareWithPicker()
@@ -127,7 +223,7 @@ struct ContentView: View {
             zoomIn: { session.perform(.zoomIn) },
             fitPage: { session.perform(.fitPage) },
             setPageLayout: { session.setPageLayout($0) },
-            save: { session.save() },
+            save: saveDocument,
             saveAs: saveDocumentAs,
             pageSetup: { session.perform(.pageSetup) },
             printDocument: { session.perform(.printDocument) },
@@ -157,8 +253,12 @@ struct ContentView: View {
             canNudgeSelection: session.selectedAnnotation != nil || session.selectedFormField != nil,
             canSave: session.isDirty,
             canPrint: session.document?.allowsPrinting == true,
-            showCommandPalette: { commandPalettePresented = true },
-            openRecipePress: { RecipeWorkspaceWindowManager.shared.open(for: session) },
+            showCommandPalette: {
+                if edition == .direct { commandPalettePresented = true }
+            },
+            openRecipePress: {
+                if edition == .direct { RecipeWorkspaceWindowManager.shared.open(for: session) }
+            },
             setTheme: { themePreference.wrappedValue = $0 }
         )
     }
@@ -205,6 +305,22 @@ struct ContentView: View {
         }
     }
 
+    private func newDocument() {
+        if session.document == nil {
+            session.createBlankDocument()
+        } else {
+            DocumentWindowManager.shared.newDocument(edition: edition)
+        }
+    }
+
+    private func saveDocument() {
+        if session.fileURL == nil {
+            saveDocumentAs()
+        } else {
+            session.save()
+        }
+    }
+
     private func saveDocumentAs() {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.pdf]
@@ -232,6 +348,7 @@ private struct ReaderView: View {
     @Binding var workspaceMode: DocumentWorkspaceMode
     let openDocument: () -> Void
     let saveAs: () -> Void
+    let edition: SPDFVEdition
 
     var body: some View {
         VStack(spacing: 0) {
@@ -241,7 +358,12 @@ private struct ReaderView: View {
                 openDocument: openDocument
             )
 
-            WorkspaceBench(session: session, mode: $workspaceMode, saveAs: saveAs)
+            WorkspaceBench(
+                session: session,
+                mode: $workspaceMode,
+                saveAs: saveAs,
+                edition: edition
+            )
 
             if session.selectedAnnotation != nil {
                 AnnotationInspectorStrip(session: session)
@@ -260,7 +382,7 @@ private struct ReaderView: View {
 
             HStack(spacing: 0) {
                 if session.thumbnailsVisible {
-                    NavigatorSidebar(session: session)
+                    NavigatorSidebar(session: session, edition: edition)
                         .frame(width: 244)
                         .transition(.move(edge: .leading).combined(with: .opacity))
 

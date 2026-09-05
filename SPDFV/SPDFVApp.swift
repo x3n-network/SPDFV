@@ -12,6 +12,10 @@ struct SPDFVApp: App {
     @NSApplicationDelegateAdaptor(SPDFVApplicationDelegate.self) private var applicationDelegate
     private let updaterController = SPDFVUpdaterController()
 
+    init() {
+        DocumentWindowManager.shared.configure(edition: .direct)
+    }
+
     private var testDocumentURL: URL? {
 #if DEBUG
         ProcessInfo.processInfo.environment["SPDFV_UI_TEST_PDF"].map(URL.init(fileURLWithPath:))

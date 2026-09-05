@@ -6,10 +6,13 @@ import UniformTypeIdentifiers
 
 struct PagesNavigator: View {
     @ObservedObject var session: DocumentSession
+    let showsEditingControls: Bool
 
     var body: some View {
         VStack(spacing: 0) {
-            BinderyRail(session: session)
+            if showsEditingControls {
+                BinderyRail(session: session)
+            }
 
             ScrollViewReader { proxy in
                 ScrollView {

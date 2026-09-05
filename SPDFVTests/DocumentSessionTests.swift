@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import PDFKit
 import SPDFVCore
 import XCTest
@@ -301,6 +302,53 @@ final class DocumentSessionTests: XCTestCase {
         XCTAssertNil(session.doctorReport)
         XCTAssertNil(session.doctorRepairPlan)
         XCTAssertEqual(session.signatureVerificationReport?.status, PDFSignatureOverallStatus.none)
+    }
+
+    func testCreateBlankDocumentProducesUnsavedWritableLetterPage() throws {
+        let destination = temporaryPDFURL()
+        defer { try? FileManager.default.removeItem(at: destination) }
+
+        let session = DocumentSession()
+        session.createBlankDocument()
+
+        XCTAssertEqual(session.displayName, "Untitled")
+        XCTAssertNil(session.fileURL)
+        XCTAssertEqual(session.pageCount, 1)
+        XCTAssertEqual(session.selectedPageIndices, [0])
+        XCTAssertTrue(session.isDirty)
+
+        let page = try XCTUnwrap(session.document?.page(at: 0))
+        XCTAssertEqual(page.bounds(for: .mediaBox).width, 612, accuracy: 0.01)
+        XCTAssertEqual(page.bounds(for: .mediaBox).height, 792, accuracy: 0.01)
+
+        XCTAssertTrue(session.save(to: destination))
+        XCTAssertEqual(session.fileURL, destination)
+        XCTAssertFalse(session.isDirty)
+        XCTAssertEqual(PDFDocument(url: destination)?.pageCount, 1)
+    }
+
+    func testReaderEditionExposesInteractivePDFToolsWithoutAutomationBranding() {
+        XCTAssertEqual(SPDFVEdition.reader.workspaceModes, [.read, .markup, .organize, .automate])
+        XCTAssertEqual(SPDFVEdition.reader.workspaceLabel(for: .automate), "Tools")
+        XCTAssertEqual(SPDFVEdition.direct.workspaceLabel(for: .automate), "Automate")
+        XCTAssertEqual(SPDFVEdition.reader.navigatorModes, NavigatorMode.allCases)
+    }
+
+    func testViewStateBridgesDoNotRepublishUnchangedValues() {
+        let session = DocumentSession()
+        session.createBlankDocument()
+
+        var publicationCount = 0
+        let observation = session.objectWillChange.sink {
+            publicationCount += 1
+        }
+
+        session.updatePage(index: session.pageIndex)
+        session.updateScale(session.scaleFactor)
+        session.updateSelection(hasText: false)
+
+        XCTAssertEqual(publicationCount, 0)
+        withExtendedLifetime(observation) {}
     }
 
     private func makePDF(

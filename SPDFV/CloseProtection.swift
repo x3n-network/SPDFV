@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 @MainActor
 final class CloseProtectionCenter {
@@ -40,20 +41,34 @@ final class CloseProtectionCenter {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = "Save changes to \(session.displayName)?"
-        alert.informativeText = "Your PDF annotations have not been saved."
+        alert.informativeText = "Your PDF changes have not been saved."
         alert.addButton(withTitle: "Save Changes")
         alert.addButton(withTitle: "Discard Changes")
         alert.addButton(withTitle: "Cancel")
 
         switch alert.runModal() {
         case .alertFirstButtonReturn:
-            return session.save()
+            return save(session)
         case .alertSecondButtonReturn:
             session.discardUnsavedChangesForClosing()
             return true
         default:
             return false
         }
+    }
+
+    private func save(_ session: DocumentSession) -> Bool {
+        if session.fileURL != nil {
+            return session.save()
+        }
+
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.pdf]
+        panel.canCreateDirectories = true
+        panel.nameFieldStringValue = "Untitled.pdf"
+        panel.message = "Save this PDF before closing"
+        guard panel.runModal() == .OK, let url = panel.url else { return false }
+        return session.save(to: url)
     }
 
     private func purgeReleasedSessions() {
@@ -136,6 +151,7 @@ struct WindowCloseGuard: NSViewRepresentable {
         var viewerActions: ViewerActions
         private weak var window: NSWindow?
         private weak var originalDelegate: NSWindowDelegate?
+        private var commandRefreshTask: Task<Void, Never>?
 
         init(session: DocumentSession, viewerActions: ViewerActions) {
             self.session = session
@@ -155,6 +171,8 @@ struct WindowCloseGuard: NSViewRepresentable {
         }
 
         func detach() {
+            commandRefreshTask?.cancel()
+            commandRefreshTask = nil
             ViewerCommandCenter.shared.deactivate(session)
             if let window, window.delegate === self {
                 window.delegate = originalDelegate
@@ -180,7 +198,14 @@ struct WindowCloseGuard: NSViewRepresentable {
 
         func refreshActiveCommands() {
             guard window?.isKeyWindow == true else { return }
-            ViewerCommandCenter.shared.activate(viewerActions, for: session)
+            guard commandRefreshTask == nil else { return }
+            commandRefreshTask = Task { @MainActor [weak self] in
+                await Task.yield()
+                guard let self else { return }
+                self.commandRefreshTask = nil
+                guard !Task.isCancelled, self.window?.isKeyWindow == true else { return }
+                ViewerCommandCenter.shared.activate(self.viewerActions, for: self.session)
+            }
         }
 
         override func responds(to aSelector: Selector!) -> Bool {

@@ -74,6 +74,14 @@ struct PDFWorkspace: NSViewRepresentable {
 
         private let session: DocumentSession
         private var observers: [NSObjectProtocol] = []
+        private var pendingReports: Set<StateReport> = []
+        private var reportTask: Task<Void, Never>?
+
+        private enum StateReport: Hashable {
+            case page
+            case scale
+            case selection
+        }
 
         init(session: DocumentSession) {
             self.session = session
@@ -127,28 +135,48 @@ struct PDFWorkspace: NSViewRepresentable {
                     object: pdfView,
                     queue: .main
                 ) { [weak self] _ in
-                    MainActor.assumeIsolated { self?.reportPage() }
+                    MainActor.assumeIsolated { self?.scheduleReport(.page) }
                 },
                 center.addObserver(
                     forName: .PDFViewScaleChanged,
                     object: pdfView,
                     queue: .main
                 ) { [weak self] _ in
-                    MainActor.assumeIsolated { self?.reportScale() }
+                    MainActor.assumeIsolated { self?.scheduleReport(.scale) }
                 },
                 center.addObserver(
                     forName: .PDFViewSelectionChanged,
                     object: pdfView,
                     queue: .main
                 ) { [weak self] _ in
-                    MainActor.assumeIsolated { self?.reportSelection() }
+                    MainActor.assumeIsolated { self?.scheduleReport(.selection) }
                 }
             ]
         }
 
         func stopObserving() {
+            reportTask?.cancel()
+            reportTask = nil
+            pendingReports.removeAll()
             observers.forEach(NotificationCenter.default.removeObserver)
             observers.removeAll()
+        }
+
+        private func scheduleReport(_ report: StateReport) {
+            pendingReports.insert(report)
+            guard reportTask == nil else { return }
+            reportTask = Task { @MainActor [weak self] in
+                await Task.yield()
+                guard let self else { return }
+                self.reportTask = nil
+                guard !Task.isCancelled else { return }
+
+                let reports = self.pendingReports
+                self.pendingReports.removeAll()
+                if reports.contains(.page) { self.reportPage() }
+                if reports.contains(.scale) { self.reportScale() }
+                if reports.contains(.selection) { self.reportSelection() }
+            }
         }
 
         func perform(_ action: ViewerAction) {

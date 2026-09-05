@@ -68,6 +68,8 @@ xcodebuild \
   build
 ```
 
+The same MIT-licensed source tree also contains an `SPDFV Reader` target for the Mac App Store, published as **Simple PDF Viewer**. It supports the interactive PDF feature set—including creation, editing, annotations, forms, page organization, OCR, permanent redaction, comparison, and Document Doctor—while omitting Sparkle, the CLI, and workflow automation such as recipes, queues, folder watching, and background processing. See [the App Store build guide](docs/APP_STORE.md).
+
 ## Validate changes
 
 Run the same repository audit, PDFKit round-trip smoke test, package tests, native app tests, and unsigned UI automation build used by CI:
@@ -112,7 +114,7 @@ The full command reference and examples live in [CLI/README.md](CLI/README.md).
 ## Repository layout
 
 ```text
-SPDFV/       macOS app
+SPDFV/       macOS app and shared source for the App Store reader/editor target
 SPDFVTests/  native app state-transition tests
 SPDFVUITests/ critical document-flow UI automation
 CompatibilityCorpus/ redistributable PDF compatibility fixtures and manifest

@@ -7,17 +7,27 @@ final class DocumentWindowManager {
 
     private final class WeakSession {
         weak var value: DocumentSession?
-        init(_ value: DocumentSession) { self.value = value }
+        let edition: SPDFVEdition
+
+        init(_ value: DocumentSession, edition: SPDFVEdition) {
+            self.value = value
+            self.edition = edition
+        }
     }
 
     private var sessions: [ObjectIdentifier: WeakSession] = [:]
     private var windowControllers: [ObjectIdentifier: NSWindowController] = [:]
     private var closeObservers: [ObjectIdentifier: NSObjectProtocol] = [:]
+    private var defaultEdition = SPDFVEdition.direct
 
     private init() {}
 
-    func register(_ session: DocumentSession) {
-        sessions[ObjectIdentifier(session)] = WeakSession(session)
+    func configure(edition: SPDFVEdition) {
+        defaultEdition = edition
+    }
+
+    func register(_ session: DocumentSession, edition: SPDFVEdition) {
+        sessions[ObjectIdentifier(session)] = WeakSession(session, edition: edition)
         purgeReleasedSessions()
     }
 
@@ -44,10 +54,15 @@ final class DocumentWindowManager {
             if let existing = existingWindow(for: url) {
                 existing.makeKeyAndOrderFront(nil)
             } else {
-                makeWindow(for: url)
+                makeWindow(for: url, edition: defaultEdition)
             }
         }
 
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func newDocument(edition: SPDFVEdition? = nil) {
+        makeWindow(for: nil, edition: edition ?? defaultEdition)
         NSApp.activate(ignoringOtherApps: true)
     }
 
@@ -58,18 +73,24 @@ final class DocumentWindowManager {
             .window
     }
 
-    private func makeWindow(for url: URL) {
+    private func makeWindow(for url: URL?, edition: SPDFVEdition) {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1080, height: 760),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
-        window.title = url.deletingPathExtension().lastPathComponent
+        window.title = url?.deletingPathExtension().lastPathComponent ?? "Untitled"
         window.titleVisibility = .visible
         window.toolbarStyle = .unified
         window.isReleasedWhenClosed = false
-        window.contentViewController = NSHostingController(rootView: ContentView(initialURL: url))
+        window.contentViewController = NSHostingController(
+            rootView: ContentView(
+                initialURL: url,
+                createsBlankDocument: url == nil,
+                edition: edition
+            )
+        )
         window.center()
 
         let controller = NSWindowController(window: window)

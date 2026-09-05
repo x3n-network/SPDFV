@@ -9,6 +9,7 @@ struct WorkspaceBench: View {
     @Binding var mode: DocumentWorkspaceMode
     @Environment(\.openWindow) private var openWindow
     let saveAs: () -> Void
+    let edition: SPDFVEdition
     @State private var showsOCRPanel = false
     @State private var showsRedactionGate = false
 
@@ -27,7 +28,13 @@ struct WorkspaceBench: View {
 
     private func bench(compact: Bool) -> some View {
         HStack(spacing: 8) {
-            WorkspaceModePicker(selection: $mode, compact: compact, select: selectMode)
+            WorkspaceModePicker(
+                selection: $mode,
+                modes: edition.workspaceModes,
+                edition: edition,
+                compact: compact,
+                select: selectMode
+            )
             divider
             tools(compact: compact)
             Spacer(minLength: 8)
@@ -45,7 +52,11 @@ struct WorkspaceBench: View {
         case .organize:
             organizeTools(compact: compact)
         case .automate:
-            automateTools(compact: compact)
+            if edition == .direct {
+                automateTools(compact: compact)
+            } else {
+                readerDocumentTools(compact: compact)
+            }
         }
     }
 
@@ -62,6 +73,18 @@ struct WorkspaceBench: View {
             BenchButton("Find", icon: .search) { showNavigator(.search) }
             BenchButton("Compare", icon: .copy) { compareDocument() }
             status(comparisonStatus)
+        }
+    }
+
+    @ViewBuilder
+    private func readerDocumentTools(compact: Bool) -> some View {
+        ocrButton(compact: compact)
+        redactionButton(compact: compact)
+        if compact {
+            SquareToolButton(icon: .info, help: "Run Document Doctor") { runDocumentDoctor() }
+        } else {
+            BenchButton("Doctor", icon: .info) { runDocumentDoctor() }
+            status("On-device PDF tools")
         }
     }
 
@@ -322,6 +345,11 @@ struct WorkspaceBench: View {
         session.compareWithPicker()
     }
 
+    private func runDocumentDoctor() {
+        showNavigator(.info)
+        session.runDocumentDoctor()
+    }
+
     private var comparisonStatus: String {
         if session.isComparing { return "Comparing…" }
         switch session.comparisonReport?.status {
@@ -357,27 +385,29 @@ struct WorkspaceBench: View {
 
 private struct WorkspaceModePicker: View {
     @Binding var selection: DocumentWorkspaceMode
+    let modes: [DocumentWorkspaceMode]
+    let edition: SPDFVEdition
     let compact: Bool
     let select: (DocumentWorkspaceMode) -> Void
 
     var body: some View {
         if compact {
             Menu {
-                ForEach(DocumentWorkspaceMode.allCases) { mode in
+                ForEach(modes) { mode in
                     Button {
                         select(mode)
                     } label: {
                         if mode == selection {
-                            SPDFVIconLabel(title: mode.label, icon: .check)
+                            SPDFVIconLabel(title: edition.workspaceLabel(for: mode), icon: .check)
                         } else {
-                            SPDFVIconLabel(title: mode.label, icon: mode.icon)
+                            SPDFVIconLabel(title: edition.workspaceLabel(for: mode), icon: mode.icon)
                         }
                     }
                 }
             } label: {
                 HStack(spacing: 7) {
                     SPDFVIcon(selection.icon)
-                    Text(selection.label)
+                    Text(edition.workspaceLabel(for: selection))
                         .font(.system(size: 11, weight: .semibold, design: .rounded))
                 }
                 .foregroundStyle(Color.white)
@@ -388,19 +418,19 @@ private struct WorkspaceModePicker: View {
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
-            .help("Workspace: \(selection.label)")
+            .help("Workspace: \(edition.workspaceLabel(for: selection))")
             .accessibilityLabel("Document workspace")
-            .accessibilityValue(selection.label)
+            .accessibilityValue(edition.workspaceLabel(for: selection))
             .accessibilityIdentifier("workspace.selector")
         } else {
             HStack(spacing: 0) {
-                ForEach(DocumentWorkspaceMode.allCases) { mode in
+                ForEach(modes) { mode in
                     Button {
                         select(mode)
                     } label: {
                         HStack(spacing: 6) {
                             SPDFVIcon(mode.icon, size: 11)
-                            Text(mode.label)
+                            Text(edition.workspaceLabel(for: mode))
                                 .font(.system(size: 11, weight: .semibold, design: .rounded))
                         }
                         .foregroundStyle(mode == selection ? Color.white : SPDFVTheme.secondaryText)
@@ -410,7 +440,7 @@ private struct WorkspaceModePicker: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("\(mode.label) workspace")
+                    .accessibilityLabel("\(edition.workspaceLabel(for: mode)) workspace")
                     .accessibilityValue(mode == selection ? "Selected" : "Not selected")
                     .accessibilityIdentifier("workspace.\(mode.rawValue)")
                 }

@@ -1,14 +1,19 @@
+import AppKit
 import Combine
 import SwiftUI
 
 struct ViewerActions {
+    let newDocument: () -> Void
     let openDocument: () -> Void
     let toggleNavigator: () -> Void
     let showPages: () -> Void
     let showOutline: () -> Void
     let showSearch: () -> Void
+    let showForms: () -> Void
     let showAnnotations: () -> Void
     let showInfo: () -> Void
+    let showPDFTools: () -> Void
+    let runDocumentDoctor: () -> Void
     let compareDocument: () -> Void
     let previousPage: () -> Void
     let nextPage: () -> Void
@@ -103,6 +108,12 @@ struct SPDFVCommands: Commands {
         }
 
         CommandGroup(replacing: .newItem) {
+            Button("New Blank PDF") {
+                actions?.newDocument()
+            }
+            .keyboardShortcut("n")
+            .disabled(actions == nil)
+
             Button("Open PDF…") {
                 actions?.openDocument()
             }
@@ -263,6 +274,181 @@ struct SPDFVCommands: Commands {
                 openWindow(id: "processing-queue")
             }
             .keyboardShortcut("l", modifiers: [.command, .shift])
+        }
+    }
+}
+
+struct SPDFVReaderCommands: Commands {
+    @FocusedValue(\.viewerActions) private var focusedActions
+    @ObservedObject private var commandCenter = ViewerCommandCenter.shared
+
+    private var actions: ViewerActions? {
+        focusedActions ?? commandCenter.actions
+    }
+
+    var body: some Commands {
+        CommandGroup(after: .appInfo) {
+            Button("SPDFV Source Code…") {
+                guard let url = URL(string: "https://github.com/x3n-network/SPDFV") else { return }
+                NSWorkspace.shared.open(url)
+            }
+            Button("MIT License…") {
+                guard let url = URL(string: "https://github.com/x3n-network/SPDFV/blob/main/LICENSE") else { return }
+                NSWorkspace.shared.open(url)
+            }
+        }
+
+        CommandGroup(replacing: .undoRedo) {
+            Button(actions?.undoTitle ?? "Undo") { actions?.undoEdit() }
+                .keyboardShortcut("z")
+                .disabled(actions?.canUndoEdit != true)
+            Button(actions?.redoTitle ?? "Redo") { actions?.redoEdit() }
+                .keyboardShortcut("z", modifiers: [.command, .shift])
+                .disabled(actions?.canRedoEdit != true)
+        }
+
+        CommandGroup(replacing: .newItem) {
+            Button("New Blank PDF") { actions?.newDocument() }
+                .keyboardShortcut("n")
+                .disabled(actions == nil)
+            Button("Open PDF…") { actions?.openDocument() }
+                .keyboardShortcut("o")
+                .disabled(actions == nil)
+        }
+
+        CommandGroup(replacing: .saveItem) {
+            Button("Save") { actions?.save() }
+                .keyboardShortcut("s")
+                .disabled(actions?.canSave != true)
+            Button("Save As…") { actions?.saveAs() }
+                .keyboardShortcut("s", modifiers: [.command, .shift])
+                .disabled(actions == nil)
+        }
+
+        CommandGroup(replacing: .printItem) {
+            Button("Page Setup…") { actions?.pageSetup() }
+                .keyboardShortcut("p", modifiers: [.command, .shift])
+                .disabled(actions?.canPrint != true)
+            Button("Print…") { actions?.printDocument() }
+                .keyboardShortcut("p")
+                .disabled(actions?.canPrint != true)
+        }
+
+        CommandMenu("Markup") {
+            ForEach(MarkupKind.allCases) { kind in
+                Button(kind.label) { actions?.addMarkup(kind) }
+                    .disabled(actions?.canAnnotate != true)
+            }
+
+            Divider()
+
+            ForEach(CanvasAnnotationTool.allCases) { tool in
+                Button(tool.label) { actions?.setAnnotationTool(tool) }
+            }
+
+            Divider()
+
+            Button("Delete Selected Annotation") { actions?.deleteAnnotation() }
+                .keyboardShortcut(.delete, modifiers: [])
+                .disabled(actions?.canDeleteAnnotation != true)
+            Button("Duplicate Selected Annotation") { actions?.duplicateAnnotation() }
+                .keyboardShortcut("d")
+                .disabled(actions?.canDeleteAnnotation != true)
+
+            Section("Nudge selected object") {
+                Button("Nudge Left") { actions?.nudgeSelection(-1, 0) }
+                    .keyboardShortcut(.leftArrow, modifiers: [.command])
+                Button("Nudge Right") { actions?.nudgeSelection(1, 0) }
+                    .keyboardShortcut(.rightArrow, modifiers: [.command])
+                Button("Nudge Up") { actions?.nudgeSelection(0, 1) }
+                    .keyboardShortcut(.upArrow, modifiers: [.command])
+                Button("Nudge Down") { actions?.nudgeSelection(0, -1) }
+                    .keyboardShortcut(.downArrow, modifiers: [.command])
+            }
+            .disabled(actions?.canNudgeSelection != true)
+        }
+
+        CommandMenu("Pages") {
+            Button("Select All Pages") { actions?.selectAllPages() }
+                .keyboardShortcut("a", modifiers: [.command, .option])
+            Button("Clear Page Selection") { actions?.clearPageSelection() }
+
+            Divider()
+
+            Button("Move Page Earlier") { actions?.movePage(-1) }
+                .keyboardShortcut(.upArrow, modifiers: [.command, .option])
+            Button("Move Page Later") { actions?.movePage(1) }
+                .keyboardShortcut(.downArrow, modifiers: [.command, .option])
+
+            Divider()
+
+            Button((actions?.selectedPageCount ?? 0) > 1 ? "Rotate Selected Pages Left" : "Rotate Page Left") { actions?.rotatePage(false) }
+                .keyboardShortcut("l", modifiers: [.command, .option])
+            Button((actions?.selectedPageCount ?? 0) > 1 ? "Rotate Selected Pages Right" : "Rotate Page Right") { actions?.rotatePage(true) }
+                .keyboardShortcut("r", modifiers: [.command, .option])
+            Button((actions?.selectedPageCount ?? 0) > 1 ? "Duplicate Selected Pages" : "Duplicate Page") { actions?.duplicatePage() }
+            Button((actions?.selectedPageCount ?? 0) > 1 ? "Delete Selected Pages" : "Delete Page") { actions?.deletePage() }
+                .disabled(actions?.canDeletePage != true)
+
+            Divider()
+
+            Button((actions?.selectedPageCount ?? 0) > 1 ? "Extract Selected Pages…" : "Extract Page…") { actions?.extractPage() }
+            Button("Append PDF…") { actions?.appendPDF() }
+        }
+
+        CommandMenu("Navigate") {
+            Button("Pages") { actions?.showPages() }
+                .keyboardShortcut("1")
+            Button("Contents") { actions?.showOutline() }
+                .keyboardShortcut("2")
+            Button("Find in Document…") { actions?.showSearch() }
+                .keyboardShortcut("f")
+            Button("Fields") { actions?.showForms() }
+                .keyboardShortcut("5")
+            Button("Annotations") { actions?.showAnnotations() }
+                .keyboardShortcut("4")
+            Button("Document Info") { actions?.showInfo() }
+                .keyboardShortcut("3")
+
+            Divider()
+
+            Button("Open PDF Tools") { actions?.showPDFTools() }
+                .keyboardShortcut("t", modifiers: [.command, .shift])
+            Button("Run Document Doctor") { actions?.runDocumentDoctor() }
+            Button("Compare with PDF…") { actions?.compareDocument() }
+                .keyboardShortcut("d", modifiers: [.command, .shift])
+
+            Divider()
+
+            Button("Previous Page") { actions?.previousPage() }
+                .keyboardShortcut(.leftArrow, modifiers: [.option])
+            Button("Next Page") { actions?.nextPage() }
+                .keyboardShortcut(.rightArrow, modifiers: [.option])
+            Button("Toggle Navigator") { actions?.toggleNavigator() }
+                .keyboardShortcut("s", modifiers: [.command, .control])
+        }
+
+        CommandMenu("View Scale") {
+            Section("Page layout") {
+                ForEach(PageLayoutMode.allCases) { layout in
+                    Button(layout.label) { actions?.setPageLayout(layout) }
+                }
+            }
+
+            Divider()
+
+            Button("Zoom In") { actions?.zoomIn() }
+                .keyboardShortcut("+")
+            Button("Zoom Out") { actions?.zoomOut() }
+                .keyboardShortcut("-")
+            Button("Fit Page") { actions?.fitPage() }
+                .keyboardShortcut("0")
+        }
+
+        CommandMenu("Appearance") {
+            ForEach(ThemePreference.allCases) { preference in
+                Button(preference.label) { actions?.setTheme(preference) }
+            }
         }
     }
 }
