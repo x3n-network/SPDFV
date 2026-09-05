@@ -159,9 +159,16 @@ struct ContentView: View {
             environment[key] ?? defaults.string(forKey: key)
         }
 
-        if captureValue("SPDFV_UI_TEST_WINDOW_SIZE") == "app-store" {
+        if let captureSize = captureValue("SPDFV_UI_TEST_WINDOW_SIZE") {
             DispatchQueue.main.async {
-                NSApp.keyWindow?.setContentSize(NSSize(width: 1080, height: 760))
+                switch captureSize {
+                case "app-store":
+                    NSApp.keyWindow?.setContentSize(NSSize(width: 1080, height: 760))
+                case "github":
+                    NSApp.keyWindow?.setContentSize(NSSize(width: 1440, height: 868))
+                default:
+                    break
+                }
             }
         }
 
@@ -186,6 +193,11 @@ struct ContentView: View {
            let oneBasedPage = Int(rawPage),
            oneBasedPage > 0 {
             session.goToPage(oneBasedPage - 1)
+        }
+        if captureValue("SPDFV_UI_TEST_COMMAND_PALETTE") == "1", edition == .direct {
+            DispatchQueue.main.async {
+                commandPalettePresented = true
+            }
         }
 #endif
     }
