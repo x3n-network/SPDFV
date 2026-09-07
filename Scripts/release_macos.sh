@@ -16,10 +16,29 @@ notary_profile="${NOTARY_PROFILE:-SPDFV-notary}"
 project_root="$(cd "$(dirname "$0")/.." && pwd)"
 project_file="$project_root/SPDFV.xcodeproj/project.pbxproj"
 appcast_path="$project_root/Updates/appcast.xml"
-current_version="$(sed -n 's/^[[:space:]]*MARKETING_VERSION = \([^;]*\);/\1/p' "$project_file" | head -n 1)"
-current_build="$(sed -n 's/^[[:space:]]*CURRENT_PROJECT_VERSION = \([0-9][0-9]*\);/\1/p' "$project_file" | head -n 1)"
+xcode_developer_dir="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
+
+for required_tool in xcodebuild git sed swift; do
+    if ! command -v "$required_tool" >/dev/null 2>&1; then
+        echo "Missing required tool: $required_tool"
+        exit 69
+    fi
+done
+
+if ! app_build_settings="$(
+    DEVELOPER_DIR="$xcode_developer_dir" xcodebuild \
+        -project "$project_root/SPDFV.xcodeproj" \
+        -target SPDFV \
+        -configuration Release \
+        -showBuildSettings 2>/dev/null
+)"; then
+    echo "Could not read build settings for the SPDFV target."
+    exit 70
+fi
+current_version="$(awk '$1 == "MARKETING_VERSION" && $2 == "=" { print $3; exit }' <<< "$app_build_settings")"
+current_build="$(awk '$1 == "CURRENT_PROJECT_VERSION" && $2 == "=" { print $3; exit }' <<< "$app_build_settings")"
 if [[ ! "$current_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ || ! "$current_build" =~ ^[1-9][0-9]*$ ]]; then
-    echo "Could not read a valid app version and build from $project_file"
+    echo "Could not read a valid app version and build for the SPDFV target in $project_file"
     exit 70
 fi
 build_number="${BUILD_NUMBER:-$((current_build + 1))}"
@@ -41,13 +60,6 @@ cleanup() {
     exit "$exit_status"
 }
 trap cleanup EXIT
-
-for required_tool in xcodebuild git sed swift; do
-    if ! command -v "$required_tool" >/dev/null 2>&1; then
-        echo "Missing required tool: $required_tool"
-        exit 69
-    fi
-done
 
 if [[ ! "$build_number" =~ ^[1-9][0-9]*$ ]]; then
     echo "BUILD_NUMBER must be a positive integer: $build_number"
@@ -97,8 +109,6 @@ if [[ "${ALLOW_DIRTY:-0}" != "1" ]] && [[ -n "$(git -C "$project_root" status --
     echo "Set ALLOW_DIRTY=1 only for a local rehearsal."
     exit 65
 fi
-
-xcode_developer_dir="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 
 run_validation() {
     echo "Running release validation gates…"

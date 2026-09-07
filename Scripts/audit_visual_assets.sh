@@ -6,15 +6,37 @@ project_root="$(cd "$(dirname "$0")/.." && pwd)"
 source_root="$project_root/SPDFV"
 icon_root="$source_root/Assets.xcassets/SPDFVIcons"
 
-if rg -n 'Image\(systemName:|NSImage\(systemSymbolName:|UIImage\(systemName:|systemImage:' "$source_root" --glob '*.swift'; then
+if command -v rg >/dev/null 2>&1; then
+    symbol_matches() {
+        rg -n 'Image\(systemName:|NSImage\(systemSymbolName:|UIImage\(systemName:|systemImage:' "$source_root" --glob '*.swift'
+    }
+    emoji_matches() {
+        rg -n --pcre2 '[\x{1F000}-\x{1FAFF}\x{2600}-\x{27BF}]' "$project_root" \
+            --glob '!**/*.xcodeproj/**' \
+            --glob '!**/*.png' \
+            --glob '!**/*.svg'
+    }
+else
+    symbol_matches() {
+        git -C "$project_root" grep -n -E \
+            'Image\(systemName:|NSImage\(systemSymbolName:|UIImage\(systemName:|systemImage:' \
+            -- ':(glob)SPDFV/**/*.swift'
+    }
+    emoji_matches() {
+        git -C "$project_root" grep -n -P '[\x{1F000}-\x{1FAFF}\x{2600}-\x{27BF}]' \
+            -- . \
+            ':(exclude,glob)**/*.xcodeproj/**' \
+            ':(exclude,glob)**/*.png' \
+            ':(exclude,glob)**/*.svg'
+    }
+fi
+
+if symbol_matches; then
     echo "Visual audit failed: platform symbol API usage remains."
     exit 1
 fi
 
-if rg -n --pcre2 '[\x{1F000}-\x{1FAFF}\x{2600}-\x{27BF}]' "$project_root" \
-    --glob '!**/*.xcodeproj/**' \
-    --glob '!**/*.png' \
-    --glob '!**/*.svg'; then
+if emoji_matches; then
     echo "Visual audit failed: emoji code points remain in project text."
     exit 1
 fi
